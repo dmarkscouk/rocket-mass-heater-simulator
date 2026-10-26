@@ -15,7 +15,8 @@ simulator in the document shell from `.github/pages/head.html` to make `index.ht
 - Place the core, choose a 6″ or 8″ system, riser height and riser insulation.
 - Swap the steel drum for a firebrick bell, and wrap either in mass or insulation.
 - Fit a counterflow heat exchanger that preheats combustion air from the exhaust.
-- Set fires per day, wood per fire, building heat loss, outdoor temperature and floor insulation.
+- Rebuild the bench at 1× to 5× its flue length with the Bench length control.
+- Set the fire length, building heat loss, outdoor temperature and floor insulation.
 
 ## What it reports
 
@@ -23,7 +24,7 @@ simulator in the document shell from `.github/pages/head.html` to make `index.ht
   heat kept indoors, wood burned, room peak, hours until the room is back to outdoor + 1 °C,
   comfortable hours, bench-top and flue-exit peaks, draft margin, and where the energy goes.
 - Every result is compared with a regular RMH (classic 8″ cob bench, steel drum) under the same fire, or with a design you pin.
-- Temperature-coloured 3D view and timeline you can scrub or play, plus a pinned baseline for comparisons.
+- Temperature-coloured 3D view and a one-week timeline you can scrub or play.
 
 ## The model
 
