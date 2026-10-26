@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: workshop console. Tool rail | 3D stage over a 72-hour timeline | results and build settings column */
+/* Layout: workshop console. Tool rail | 3D stage over a one-week timeline | results and build settings column */
 :root{
   --bg:#e7eae5; --panel:#f5f6f3; --ink:#1d2321; --muted:#5b6662; --line:#cfd5cf; --accent:#c4651a; --accent-ink:#ffffff;
   --scene:#dde2dc; --floor:#cbd2ca; --grid:#b3bcb3;
@@ -127,8 +127,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tile .d{font-family:var(--f-mono);font-size:10.5px;color:var(--muted)}
 .tile::after{content:"";position:absolute;top:10px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--muted)}
 .tile.good::after{background:var(--good)} .tile.warn::after{background:var(--warn)} .tile.bad::after{background:var(--bad)}
-.cool{display:flex;flex-direction:column;gap:6px}
-.cool .tile::after{display:none}
+.tile.plain::after{display:none}
 .coolwrap{position:relative;height:74px}
 .coolwrap canvas{position:absolute;inset:0;width:100%;height:100%}
 .bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--line)}
@@ -168,7 +167,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 </style>
 
 <header class="top">
-  <h1 class="brand">Rocket Mass Heater Simulator<small>Draw the core, flue and bench. The model fires it for three days and shows where the heat goes.</small></h1>
+  <h1 class="brand">Rocket Mass Heater Simulator<small>Draw the core, flue and bench. The model lights one fire from cold and follows the heat for a week.</small></h1>
   <div class="spacer"></div>
   <div class="ctl-inline">
     <label for="preset">Start from</label>
@@ -235,7 +234,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </div>
 
     <div class="float readout" aria-live="polite">
-      <div class="when" id="rWhen">Day 3 · 19:30</div>
+      <div class="when" id="rWhen">–</div>
       <span class="chip" id="rFire">Fire out</span>
       <dl class="kv">
         <dt>Room</dt><dd id="rRoom">–</dd>
@@ -263,14 +262,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </div>
   </div>
 
-  <section class="timeline" aria-label="72 hour timeline">
+  <section class="timeline" aria-label="One week timeline">
     <div class="tl-head">
-      <div class="lbl">72 hours of firing</div>
+      <div class="lbl">A week from one fire</div>
       <div class="keys">
         <span><i style="background:var(--c-room)"></i>Room</span>
         <span><i style="background:var(--c-bench)"></i>Bench top</span>
         <span style="color:var(--c-out)"><i class="dash"></i>Outdoor</span>
-        <span id="baseKey" hidden style="color:var(--c-room)"><i class="dash"></i>Baseline room</span>
+        <span id="baseKey" style="color:var(--c-room)"><i class="dash"></i><span id="baseKeyTxt">Regular RMH room</span></span>
         <span><i class="box" style="background:var(--c-barrel)"></i>Barrel kW</span>
         <span><i class="box" style="background:var(--c-bench)"></i>Bench kW</span>
         <span><i class="box" style="background:var(--c-pipe)"></i>Pipe kW</span>
@@ -278,34 +277,28 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       </div>
     </div>
     <div class="charts">
-      <div class="cw"><canvas id="chartT" aria-label="Room, bench and outdoor temperature over 72 hours"></canvas></div>
-      <div class="cw"><canvas id="chartP" aria-label="Heat given to the room over 72 hours"></canvas></div>
+      <div class="cw"><canvas id="chartT" aria-label="Room, bench and outdoor temperature over the week"></canvas></div>
+      <div class="cw"><canvas id="chartP" aria-label="Heat given to the room over the week"></canvas></div>
     </div>
     <div class="scrub">
       <button class="btn" id="playBtn">Play</button>
-      <input type="range" id="scrub" min="0" max="431" value="404" aria-label="Time">
+      <input type="range" id="scrub" min="0" max="1007" value="47" aria-label="Time">
       <output id="scrubOut"></output>
     </div>
   </section>
 
   <aside class="side">
     <section>
-      <div class="res-head"><h2>Day 3 performance</h2><span id="simStatus"></span></div>
+      <div class="res-head"><h2>One-fire results</h2><span id="simStatus"></span></div>
+      <p class="note" id="baseNote"></p>
       <div class="tiles" id="tiles"></div>
-      <div class="cool">
-        <div class="lbl">Cool-down test <span class="v" id="coolKg"></span></div>
-        <div class="field"><div class="lbl">Fire length <output id="coolBurnOut"></output></div><input type="range" id="coolBurn" min="1" max="24" step="1" aria-label="Length of the one fire in the cool-down test"></div>
-        <div class="tiles" id="coolTiles"></div>
-        <div class="coolwrap"><canvas id="coolChart" aria-label="Room temperature for a week after one 6 hour fire"></canvas></div>
-        <p class="note">Everything starts at 0 °C indoors and out. One fire of the length above, then no more. Time runs from when the fire goes out until the room is back down to 1 °C; it never quite reaches 0.</p>
-      </div>
       <div>
-        <div class="lbl">Where each day's wood goes</div>
+        <div class="lbl">Where the wood's energy goes</div>
         <div class="bar" id="bar"></div>
         <ul class="blegend" id="blegend"></ul>
       </div>
       <ul class="warnings" id="warnings"></ul>
-      <div class="row"><button class="btn primary" id="pinBtn">Pin as baseline</button><button class="btn" id="clearPin" hidden>Clear baseline</button></div>
+      <div class="row"><button class="btn primary" id="pinBtn">Pin this design as baseline</button><button class="btn" id="clearPin" hidden>Back to regular RMH</button></div>
     </section>
 
     <section>
@@ -327,10 +320,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
     <section>
       <h3>Firing</h3>
-      <div class="field"><div class="lbl">Fires per day</div><div class="seg" id="burnSeg"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
-      <div class="field"><div class="lbl">Wood per fire <output id="kgOut"></output></div><input type="range" id="kg" min="2" max="20" step="0.5"></div>
-      <label class="check"><input type="checkbox" id="cap"><span>Cap the feed tube when the fire is out. Stops cold air being drawn through the warm mass overnight.</span></label>
-      <p class="note">Fires light at <span id="burnTimes"></span>. Seasoned hardwood at 15 MJ/kg.</p>
+      <div class="field"><div class="lbl">Fire length <output id="fireOut"></output></div><input type="range" id="fireH" min="1" max="24" step="0.5" aria-label="Length of the fire in hours"></div>
+      <label class="check"><input type="checkbox" id="cap"><span>Cap the feed tube when the fire is out. Stops cold air being drawn through the warm mass.</span></label>
+      <p class="note">One fire, lit with everything at the outdoor temperature, then left to cool for a week. <span id="burnTimes"></span> Seasoned hardwood at 15 MJ/kg.</p>
     </section>
 
     <section>
@@ -423,7 +415,7 @@ const STARTS={1:[18],2:[7,18],3:[7,13,19]};
 
 /* ---------- state ---------- */
 function blank(){return {cells:new Array(GW*GH).fill(null),core:{x:2,y:1},duct:[],size:8,riserH:1.2,coreIns:'perlite',coreInsT:75,
-  burns:2,kg:9,cap:true,hx:false,hxEff:70,bell:0,benchN:0,coolBurn:6,house:'average',outdoor:5,target:19,floorIns:'50',chimney:1};}
+  burns:2,kg:9,fireH:6,cap:true,hx:false,hxEff:70,bell:0,benchN:0,house:'average',outdoor:0,target:19,floorIns:'50',chimney:1};}
 function isCore(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x-2&&i<=x+1;}
 function isBarrel(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x&&i<=x+1;}
 function adjBarrel(S,c){const i=ci(c),j=cj(c);if(isCore(S,i,j))return false;
@@ -463,7 +455,7 @@ function buildBench(S,n){S.cells=new Array(GW*GH).fill(null);S.core={x:2,y:1};
   const w=[[4,1],[18,1]];for(let k=1;k<n;k++){w.push([k%2?18:6,k+1],[k%2?6:18,k+1]);}
   route(S,w);S.benchN=n;return wrapDrum(S);}
 let S=load()||PRESETS.full();
-function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
+function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(o.fireH==null&&o.coolBurn)S.fireH=o.coolBurn;if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
   // older saves stored one material and a height per column
   S.cells=S.cells.map(c=>c?trimCell((c.L||Array(c.h||0).fill(c.m)).map(m=>MATS[m]?m:null)):null);
   sanitize(S);return S;}catch(e){return null;}}
@@ -492,7 +484,7 @@ function hrad(T1,T2){const a=T1+273.15,b=T2+273.15;return 0.9*SIG*(a*a+b*b)*(a+b
 /* opt (all optional): hours to run, iv to replace the daily fires with [[startH,endH],…], outdoor and T0 to
    override the weather and start everything at one temperature, light to skip the per-cell snapshots */
 function simulate(S,opt){
-  opt=opt||{};const outdoor=opt.outdoor!=null?opt.outdoor:S.outdoor;
+  opt=opt||{};const outdoor=opt.outdoor!=null?opt.outdoor:S.outdoor,from=opt.from!=null?opt.from:48;
   const P=sysParams(S),DI=ductInfo(S);
   const rs=S.riserH/1.2,sc=0.4+0.6*rs;
   const ins=CORE_INS[S.coreIns],tIns=S.coreIns==='none'?0:S.coreInsT/1000;
@@ -565,7 +557,7 @@ function simulate(S,opt){
 
   for(let s=0;s<NS;s++){
     const th=s*dt/3600;let firing=false;for(const v of iv)if(th>=v[0]&&th<v[1]){firing=true;break;}
-    if(s===48*3600/dt)E48=stored();
+    if(s===Math.round(from*3600/dt))E48=stored();
     const m=firing?mBurn:mIdle,mcp=m*cpg,Qf=firing?Pfire:0;
     // a hot drum acts as an afterburner: up to half of what the riser leaves unburnt is burnt out inside it
     const eta0=(0.74+0.24*smooth(350,800,Tc))*(DI.margin<1?0.8+0.2*DI.margin:1);
@@ -599,7 +591,7 @@ function simulate(S,opt){
 
     Tr+=dt*(Qbr+Qpipe+Qsurf-house.UA*(Tr-outdoor))/house.C;
 
-    if(th>=48){E.rec+=Qrec*dt;if(firing)maxAir3=Math.max(maxAir3,Tair);E.fuel+=Qf*dt;E.smoke+=Qsmoke*dt;E.exh+=Qexh*dt;E.barrel+=Qbr*dt;E.bench+=Qsurf*dt;E.pipe+=Qpipe*dt;E.ground+=Qground*dt;
+    if(th>=from){E.rec+=Qrec*dt;if(firing)maxAir3=Math.max(maxAir3,Tair);E.fuel+=Qf*dt;E.smoke+=Qsmoke*dt;E.exh+=Qexh*dt;E.barrel+=Qbr*dt;E.bench+=Qsurf*dt;E.pipe+=Qpipe*dt;E.ground+=Qground*dt;
       if(firing){maxExit3=Math.max(maxExit3,Tex);minEta=Math.min(minEta,eta);}maxCore3=Math.max(maxCore3,Tc);maxBarrel3=Math.max(maxBarrel3,Ts);maxInner3=Math.max(maxInner3,Tb);}
     aF+=Qf;aB+=Qbr;aBe+=Qsurf;aP+=Qpipe;aFire+=firing?1:0;aExit+=Tex;aRg+=Tg1;aAir+=Tair;
     if((s+1)%SE===0){const k=(s+1)/SE-1;
@@ -611,26 +603,28 @@ function simulate(S,opt){
       ser.air[k]=aAir/SE;aF=aB=aBe=aP=aFire=aExit=aRg=aAir=0;}
   }
   const dStore=stored()-E48;
-  let rmin=1e9,rmax=-1e9,hrs=0,bpk=-1e9;
-  for(let k=288;k<NK;k++){const r=ser.room[k];rmin=Math.min(rmin,r);rmax=Math.max(rmax,r);if(r>=S.target&&r<=S.target+4)hrs+=1/6;if(ser.benchMax[k]>bpk)bpk=ser.benchMax[k];}
+  let rmin=1e9,rmax=-1e9,hrs=0,bpk=-1e9,peakK=0;
+  for(let k=Math.round(from*6);k<NK;k++){const r=ser.room[k];rmin=Math.min(rmin,r);if(r>rmax){rmax=r;peakK=k;}
+    if(r>=S.target&&r<=S.target+4)hrs+=1/6;if(ser.benchMax[k]>bpk)bpk=ser.benchMax[k];}
+  // cool-down: hours from the last fire going out until the room is back within 1 °C of outdoors,
+  // counted from the peak because a heavy bench can hold the room down until its stored heat comes through
+  const fireEnd=Math.max(0,...iv.map(v=>v[1])),backAt=outdoor+1;let back=null;
+  if(rmax<=backAt)back=0;else for(let k=peakK;k<NK;k++)if(ser.room[k]<=backAt){back=Math.max(0,(k+1)/6-fireEnd);break;}
   const delivered=E.barrel+E.bench+E.pipe;
-  return {n,nodeIdx,Tsnap,gasSnap,nd,ductKey:S.duct.join(','),ser,NK,E,dStore,
-    // heat still soaking into a big mass on day 3 is kept indoors, just not released yet
-    eff:E.fuel?(delivered+Math.max(0,dStore))/E.fuel:0,roomMin:rmin,roomMax:rmax,hours:hrs,benchPeak:top.length?bpk:NaN,hasMass:top.length>0,
+  return {n,nodeIdx,Tsnap,gasSnap,nd,ductKey:S.duct.join(','),ser,NK,hours:NS*dt/3600,E,dStore,fireEnd,back,peakH:(peakK+1)/6,
+    kg:E.fuel/15e6,
+    // heat still soaking into the mass at the end is kept indoors, just not released yet
+    eff:E.fuel?(delivered+Math.max(0,dStore))/E.fuel:0,roomMin:rmin,roomMax:rmax,comfortH:hrs,benchPeak:top.length?bpk:NaN,hasMass:top.length>0,
     exitPeak:maxExit3,airPeak:maxAir3,recFrac:E.fuel?E.rec/E.fuel:0,corePeak:maxCore3,barrelPeak:maxBarrel3,innerPeak:maxInner3,drumCover:Math.min(1,Acov/P.Ab),smokeFrac:E.fuel?E.smoke/E.fuel:0,margin:DI.margin,Leq:DI.Leq,Lmax:DI.Lmax,DI,
     dur,draftF,demand:house.UA*(S.target-S.outdoor),Pfire};
 }
 
-// Cool-down test: start at 0 °C indoors and out, one 6-hour fire, then watch the room for a week
-const COOL_H=168,COOL_BACK=1;
-function coolDown(S){const burn=S.coolBurn||6;
-  const r=simulate(S,{hours:COOL_H,iv:[[0,burn]],outdoor:0,T0:0,light:true}),room=r.ser.room;
-  let peak=-1e9,peakH=0,pk=0,back=null;
-  for(let k=0;k<room.length;k++)if(room[k]>peak){peak=room[k];peakH=(k+1)/6;pk=k;}
-  // count from the peak, since a heavy bench can keep the room near 0 °C until its stored heat comes through
-  if(peak<=COOL_BACK)back=0;
-  else for(let k=pk;k<room.length;k++)if(room[k]<=COOL_BACK){back=Math.max(0,(k+1)/6-burn);break;}
-  return {room,peak,peakH,back,burn,kg:r.Pfire*burn*3600/15e6};}
+// The scenario: everything starts at the outdoor temperature, one fire of S.fireH hours, then a week of cooling
+const RUN_H=168;
+const runFire=(S,light)=>simulate(S,{hours:RUN_H,iv:[[0,S.fireH]],T0:S.outdoor,from:0,light});
+// a regular rocket mass heater (classic 8″ cob bench, steel drum) under the same fire, room and weather
+function regularOf(S){const B=PRESETS.classic();
+  for(const k of ['fireH','cap','house','outdoor','target','floorIns','chimney'])B[k]=S[k];return B;}
 
 /* ---------- colour ---------- */
 const STOPS=[[0,'#2c3e73'],[12,'#34609c'],[22,'#3f93a6'],[32,'#6fb98a'],[42,'#d2c257'],[55,'#eb9a3a'],[75,'#df5a2a'],[120,'#b8262a'],[300,'#d8451f'],[550,'#ff9a3d'],[850,'#ffe9b0']].map(([t,h])=>[t,new THREE.Color(h)]);
@@ -926,7 +920,9 @@ document.getElementById('viewBtn').addEventListener('click',resetView);
 (function(){const el=document.getElementById('benchLen');
   el.innerHTML='<option value="0" disabled>Custom</option>'+BENCH_LENGTHS.map(([n,l])=>`<option value="${n}">${l} · ${(benchCells(n)*CELL).toFixed(1)} m flue</option>`).join('');
   el.addEventListener('change',()=>{const n=+el.value;if(!n)return;pushUndo();buildBench(S,n);syncControls();changed();});})();
-document.getElementById('preset').addEventListener('change',e=>{const v=e.target.value;if(!v)return;pushUndo();S=PRESETS[v]();e.target.value='';syncControls();changed();});
+document.getElementById('preset').addEventListener('change',e=>{const v=e.target.value;if(!v)return;pushUndo();
+  // a layout change keeps the fire and weather
+  const keep={fireH:S.fireH,outdoor:S.outdoor};S=Object.assign(PRESETS[v](),keep);e.target.value='';syncControls();changed();});
 let lastHover=-1;
 const setShift=v=>{if(v===shiftDown)return;shiftDown=v;if(lastHover>=0)hoverAt(lastHover);};
 window.addEventListener('keyup',e=>{if(e.key==='Shift')setShift(false);});
@@ -942,10 +938,10 @@ document.getElementById('peel').addEventListener('input',e=>{view.peel=+e.target
 const selFill=(el,obj)=>{for(const [k,v] of Object.entries(obj)){const o=document.createElement('option');o.value=k;o.textContent=v.name;el.appendChild(o);}};
 selFill(document.getElementById('coreIns'),CORE_INS);selFill(document.getElementById('house'),HOUSES);selFill(document.getElementById('floorIns'),FLOOR);
 function bindSeg(elId,key){const el=document.getElementById(elId);el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{pushUndo();S[key]=+b.dataset.v;syncControls();changed();}));}
-bindSeg('sizeSeg','size');bindSeg('bellSeg','bell');bindSeg('burnSeg','burns');
+bindSeg('sizeSeg','size');bindSeg('bellSeg','bell');
 function bindInput(elId,key,num){const el=document.getElementById(elId);el.addEventListener('input',()=>{S[key]=num?+el.value:el.value;syncControls();changed(false,true);});
   el.addEventListener('change',()=>scheduleSim(0));}
-bindInput('riser','riserH',1);bindInput('insT','coreInsT',1);bindInput('kg','kg',1);bindInput('outdoor','outdoor',1);bindInput('target','target',1);bindInput('chimney','chimney',1);
+bindInput('riser','riserH',1);bindInput('insT','coreInsT',1);bindInput('fireH','fireH',1);bindInput('outdoor','outdoor',1);bindInput('target','target',1);bindInput('chimney','chimney',1);
 bindInput('coreIns','coreIns',0);bindInput('house','house',0);bindInput('floorIns','floorIns',0);
 document.getElementById('cap').addEventListener('change',e=>{S.cap=e.target.checked;changed();});
 document.getElementById('hx').addEventListener('change',e=>{pushUndo();S.hx=e.target.checked;syncControls();changed();});
@@ -953,24 +949,23 @@ bindInput('hxEff','hxEff',1);
 const hh=h=>{const H=Math.floor(h),M=Math.round((h-H)*60);return String(H).padStart(2,'0')+':'+String(M).padStart(2,'0');};
 function syncControls(){
   document.getElementById('benchLen').value=String(S.benchN||0);
-  document.getElementById('coolBurn').value=S.coolBurn;document.getElementById('coolBurnOut').textContent=S.coolBurn+' h';
   pressSeg(document.getElementById('sizeSeg'),S.size);pressSeg(document.getElementById('bellSeg'),S.bell?1:0);
   document.getElementById('bellNote').textContent=S.bell
     ?'A 114 mm firebrick box over the riser. It takes hours to heat, holds about 0.4 MJ/K, never warps, and keeps the burn space hot.'
     :'A 55 or 30 gallon steel drum over the riser. It heats in minutes and radiates fast, but thin steel warps above about 650 °C.';
-  document.getElementById('rBarrelLbl').textContent=S.bell?'Bell surface':'Drum';pressSeg(document.getElementById('burnSeg'),S.burns);
+  document.getElementById('rBarrelLbl').textContent=S.bell?'Bell surface':'Drum';
   const set=(i,v)=>{document.getElementById(i).value=v;};
-  set('riser',S.riserH);set('insT',S.coreInsT);set('kg',S.kg);set('outdoor',S.outdoor);set('target',S.target);set('chimney',S.chimney);
+  set('riser',S.riserH);set('insT',S.coreInsT);set('fireH',S.fireH);set('outdoor',S.outdoor);set('target',S.target);set('chimney',S.chimney);
   set('coreIns',S.coreIns);set('house',S.house);set('floorIns',S.floorIns);document.getElementById('cap').checked=S.cap;
   document.getElementById('insT').disabled=S.coreIns==='none';
   document.getElementById('hx').checked=S.hx;set('hxEff',S.hxEff);document.getElementById('hxEff').disabled=!S.hx;
   document.getElementById('hxOut').textContent=S.hx?S.hxEff+'%':'off';
   document.getElementById('rAirRow').hidden=document.getElementById('rAir').hidden=!S.hx;
   const o=(i,t)=>{document.getElementById(i).textContent=t;};
-  o('riserOut',S.riserH.toFixed(2)+' m');o('insTOut',S.coreIns==='none'?'—':S.coreInsT+' mm');o('kgOut',S.kg+' kg');
+  o('riserOut',S.riserH.toFixed(2)+' m');o('insTOut',S.coreIns==='none'?'—':S.coreInsT+' mm');o('fireOut',S.fireH+' h');
   o('outOut',S.outdoor+' °C');o('tgtOut',S.target+' °C');o('chOut',S.chimney+' m');
-  const P=sysParams(S),dur=S.kg/P.rate;
-  o('burnTimes',STARTS[S.burns].map(h=>hh(h)).join(', ')+` · about ${dur.toFixed(1)} h each at ${P.rate} kg/h`);
+  const P=sysParams(S);
+  o('burnTimes',`A ${S.size}″ core burns up to ${P.rate} kg an hour, so ${S.fireH} h is about ${(P.rate*S.fireH).toFixed(0)} kg of wood (less if the draft is weak).`);
   updateDuctStat();}
 function updateDuctStat(){const DI=ductInfo(S);const el=document.getElementById('ductStat');
   el.textContent=DI.n?`${DI.L.toFixed(2)} m run · ${DI.bends} bend${DI.bends===1?'':'s'} · counts as ${DI.Leq.toFixed(1)} m of ~${DI.Lmax.toFixed(1)} m`:'No flue yet.';}
@@ -983,47 +978,34 @@ function changed(painting,slider){
   document.getElementById('simStatus').textContent='Recalculating…';
   if(!painting)scheduleSim(slider?350:60);}
 function scheduleSim(delay){clearTimeout(simTimer);simTimer=setTimeout(runSim,delay);}
-function runSim(){if(stroke){return;}const t0=performance.now();result=simulate(S);dirty=false;
+let firstRun=true;
+function runSim(){if(stroke){return;}const t0=performance.now();result=runFire(S);dirty=false;
+  // the regular RMH baseline follows the same fire, room and weather, so rerun it alongside
+  if(!pinned)baseline=baselineOf(runFire(regularOf(S),true),'Regular RMH');
   document.getElementById('simStatus').textContent=`${result.n} mass cells · ${Math.round(performance.now()-t0)} ms`;
-  updateColors();renderResults();drawCharts();
-  // the week-long test is slower, so it follows once the main results are on screen
-  cool=null;renderCool();const gen=++coolGen;
-  setTimeout(()=>{if(gen!==coolGen)return;cool=coolDown(S);renderCool();},30);}
-let cool=null,coolGen=0;
-// fire length only affects the cool-down test, so rerun just that
-(function(){const el=document.getElementById('coolBurn');let t=null;
-  el.addEventListener('input',()=>{S.coolBurn=+el.value;document.getElementById('coolBurnOut').textContent=S.coolBurn+' h';save();
-    clearTimeout(t);t=setTimeout(()=>{cool=null;renderCool();const gen=++coolGen;setTimeout(()=>{if(gen!==coolGen)return;cool=coolDown(S);renderCool();},30);},250);});})();
-function renderCool(){const C=cool,B=baseline&&baseline.cool,el=document.getElementById('coolTiles');
-  if(!C){el.innerHTML='<div class="tile"><span class="t">Running a week of cooling…</span></div>';document.getElementById('coolKg').textContent='';drawCool();return;}
-  document.getElementById('coolKg').textContent=`${C.kg.toFixed(0)} kg of wood`;
-  const backTxt=v=>v==null?`>${COOL_H-C.burn}`:v.toFixed(0);
-  const d=(v,b,u)=>B&&v!=null&&b!=null?`<span class="d">baseline ${b.toFixed(0)}${u} (${v-b>=0?'+':''}${(v-b).toFixed(0)})</span>`:'';
-  el.innerHTML=`<div class="tile"><span class="t">Room peaks at</span><span class="n">${C.peak.toFixed(1)}</span><span class="u">°C, ${C.peakH.toFixed(1)} h after lighting</span>${d(C.peak,B&&B.peak,'°')}</div>`+
-    `<div class="tile"><span class="t">Back to ${COOL_BACK} °C after</span><span class="n">${backTxt(C.back)}</span><span class="u">hours once the fire is out</span>${d(C.back,B&&B.back,' h')}</div>`;
-  drawCool();}
-function drawCool(){const {ctx,w,h}=setupCanvas(document.getElementById('coolChart'));const C=cool;if(!C)return;
-  const pl=26,pr=6,pt=6,pb=14,hi=Math.max(5,Math.ceil(Math.max(C.peak,baseline&&baseline.cool?baseline.cool.peak:0)/5)*5);
-  const X=t=>pl+t/COOL_H*(w-pl-pr),Y=v=>pt+(1-v/hi)*(h-pt-pb);
-  ctx.fillStyle=css('--c-fire');ctx.fillRect(X(0),pt,X(C.burn)-X(0),h-pt-pb);
-  ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.fillStyle=css('--muted');ctx.font='10px "IBM Plex Mono",monospace';
-  ctx.textAlign='right';ctx.textBaseline='middle';
-  for(const v of [0,hi/2,hi]){const y=Math.round(Y(v))+0.5;ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(w-pr,y);ctx.stroke();ctx.fillText(v+'°',pl-4,y);}
-  ctx.textAlign='center';ctx.textBaseline='top';for(let d=1;d<=7;d++)ctx.fillText('D'+d,X((d-0.5)*24),h-11);
-  const plot=(arr,col,wd,dash)=>{ctx.strokeStyle=col;ctx.lineWidth=wd;ctx.setLineDash(dash||[]);ctx.beginPath();
-    for(let k=0;k<arr.length;k++){const x=X((k+1)/6),y=Y(Math.max(0,arr[k]));k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.setLineDash([]);};
-  if(baseline&&baseline.cool){ctx.globalAlpha=0.6;plot(baseline.cool.room,css('--c-room'),1.2,[4,3]);ctx.globalAlpha=1;}
-  plot(C.room,css('--c-room'),1.8);
-  if(C.back!=null){const x=X(C.back+C.burn),y=Y(COOL_BACK);ctx.fillStyle=css('--ink');ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}}
+  // open at the end of the fire, when the mass is at its hottest; afterwards keep the viewer's place
+  if(firstRun){view.k=Math.min(result.NK-1,Math.round(S.fireH*6)-1);firstRun=false;}
+  view.k=Math.min(view.k,result.NK-1);scrub.max=result.NK-1;scrub.value=view.k;
+  updateColors();renderResults();drawCharts();}
+let pinned=false;
+function baselineOf(R,name){return {name,eff:R.eff,peak:R.roomMax,peakH:R.peakH,back:R.back,comfortH:R.comfortH,
+  benchPeak:R.benchPeak,exitPeak:R.exitPeak,smokeFrac:R.smokeFrac,room:R.ser.room.slice()};}
 
 /* ---------- results ---------- */
 function renderResults(){const R=result;if(!R)return;const B=baseline;
-  const delta=(v,b,d,u)=>B&&isFinite(b)&&isFinite(v)?`<span class="d">baseline ${b.toFixed(d)}${u||''} (${v-b>=0?'+':''}${(v-b).toFixed(d)})</span>`:'';
-  const ex=R.exitPeak;
+  const delta=(v,b,d,u)=>B&&b!=null&&isFinite(b)&&v!=null&&isFinite(v)?`<span class="d">${B.name} ${b.toFixed(d)}${u||''} (${v-b>=0?'+':''}${(v-b).toFixed(d)})</span>`:'';
+  // single-fire figures have no fixed "good" level, so judge them against the baseline
+  const rel=(v,b)=>b==null||v==null||!B?'':v>b*1.05+0.05?'good':v>=b*0.95-0.05?'warn':'bad';
+  const ex=R.exitPeak,backN=v=>v==null?RUN_H:v,backTxt=R.back==null?`>${Math.round(RUN_H-R.fireEnd)}`:R.back.toFixed(0);
+  document.getElementById('baseNote').textContent=pinned
+    ?'Compared with your pinned design.'
+    :'Compared with a regular RMH: classic 8″ cob bench and steel drum, with the same fire, room and weather.';
   const tiles=[
     {t:'Heat kept indoors',n:Math.round(R.eff*100),u:'% of the wood’s energy',s:R.eff>=0.8?'good':R.eff>=0.65?'warn':'bad',d:delta(R.eff*100,B&&B.eff*100,0,'%')},
-    {t:'Room on day 3',n:`${R.roomMin.toFixed(1)}–${R.roomMax.toFixed(1)}`,u:'°C, coldest to warmest',s:R.roomMin>=S.target-1.5?'good':R.roomMax>=S.target?'warn':'bad',d:delta(R.roomMin,B&&B.roomMin,1,' min')},
-    {t:'Hours comfortable',n:R.hours.toFixed(1),u:`of 24 h at ${S.target}–${S.target+4} °C`,s:R.hours>=20?'good':R.hours>=12?'warn':'bad',d:delta(R.hours,B&&B.hours,1,' h')},
+    {t:'Wood burned',n:R.kg.toFixed(0),u:`kg in a ${S.fireH} h fire`,s:'plain',d:''},
+    {t:'Room peaks at',n:R.roomMax.toFixed(1),u:`°C, ${R.peakH.toFixed(1)} h after lighting`,s:rel(R.roomMax,B&&B.peak),d:delta(R.roomMax,B&&B.peak,1,'°')},
+    {t:`Back to ${S.outdoor+1} °C after`,n:backTxt,u:'hours once the fire is out',s:rel(backN(R.back),B&&backN(B.back)),d:delta(backN(R.back),B&&backN(B.back),0,' h')},
+    {t:'Hours comfortable',n:R.comfortH.toFixed(1),u:`at ${S.target}–${S.target+4} °C over the week`,s:rel(R.comfortH,B&&B.comfortH),d:delta(R.comfortH,B&&B.comfortH,1,' h')},
     {t:'Bench top peak',n:R.hasMass?Math.round(R.benchPeak):'—',u:R.hasMass?'°C, hottest surface cell':'no mass drawn',s:!R.hasMass?'bad':R.benchPeak>65?'bad':R.benchPeak<28?'warn':'good',d:R.hasMass?delta(R.benchPeak,B&&B.benchPeak,0,'°'):''},
     {t:'Flue exit peak',n:Math.round(ex),u:'°C leaving to outside',s:ex>220?'bad':(ex>150||ex<45)?'warn':'good',d:delta(ex,B&&B.exitPeak,0,'°')},
     {t:'Draft margin',n:R.margin>=2.5?'Ample':R.margin.toFixed(2)+'×',u:R.DI.n?`${R.Leq.toFixed(1)} m equivalent of ~${R.Lmax.toFixed(1)} m`:'no flue drawn',s:R.margin>=1.15?'good':R.margin>=1?'warn':'bad',d:''}
@@ -1054,26 +1036,25 @@ function renderResults(){const R=result;if(!R)return;const B=baseline;
   else if(R.hasMass&&R.benchPeak<28&&DI.n)W.push(['warn',`The bench top barely warms (${Math.round(R.benchPeak)} °C). The mass may be too big or too thick for the wood you burn.`]);
   if(DI.n&&R.exitPeak>150)W.push(['warn',`Flue gas leaves at up to ${Math.round(R.exitPeak)} °C. A longer run through mass would keep that heat.`]);
   if(DI.n&&R.exitPeak<45)W.push(['warn',`Flue gas leaves at only ${Math.round(R.exitPeak)} °C. Expect condensation in the chimney and a weak draft on cold days.`]);
-  const st0=STARTS[S.burns],minGap=Math.min(...st0.map((h,i)=>((st0[(i+1)%st0.length]-h)+24)%24||24));
-  if(R.dur>minGap)W.push(['warn','Each fire runs into the next one. Burn less wood per fire.']);
-  const avgKW=R.Pfire*R.dur*S.burns/24/1000;
-  if(avgKW<R.demand/1000*0.8)W.push(['warn',`The wood supplies about ${avgKW.toFixed(1)} kW on average, but the room needs about ${(R.demand/1000).toFixed(1)} kW to hold ${S.target} °C. Burn more wood or insulate the building.`]);
+  if(R.roomMax<S.target)W.push(['warn',`From cold, this fire only lifts the room to ${R.roomMax.toFixed(1)} °C. Much of its heat is still warming the mass; a longer fire, or firing again before it cools, gets more out of it.`]);
   if(!W.length)W.push(['good','No problems found. The core burns hot, the flue draws and the bench holds a comfortable temperature.']);
   document.getElementById('warnings').innerHTML=W.map(w=>`<li class="${w[0]}">${w[1]}</li>`).join('');
 }
-document.getElementById('pinBtn').addEventListener('click',()=>{if(!result)return;const R=result;
-  baseline={eff:R.eff,roomMin:R.roomMin,hours:R.hours,benchPeak:R.benchPeak,exitPeak:R.exitPeak,room:R.ser.room.slice(),cool};
-  document.getElementById('clearPin').hidden=false;document.getElementById('baseKey').hidden=false;document.getElementById('pinBtn').textContent='Re-pin baseline';renderResults();drawCharts();renderCool();});
-document.getElementById('clearPin').addEventListener('click',()=>{baseline=null;document.getElementById('clearPin').hidden=true;document.getElementById('baseKey').hidden=true;
-  document.getElementById('pinBtn').textContent='Pin as baseline';renderResults();drawCharts();renderCool();});
+document.getElementById('pinBtn').addEventListener('click',()=>{if(!result)return;
+  pinned=true;baseline=baselineOf(result,'Pinned');
+  document.getElementById('clearPin').hidden=false;document.getElementById('baseKeyTxt').textContent='Pinned design room';
+  document.getElementById('pinBtn').textContent='Re-pin this design';renderResults();drawCharts();});
+document.getElementById('clearPin').addEventListener('click',()=>{pinned=false;
+  document.getElementById('clearPin').hidden=true;document.getElementById('baseKeyTxt').textContent='Regular RMH room';
+  document.getElementById('pinBtn').textContent='Pin this design as baseline';runSim();});
 
 /* ---------- readout & timeline ---------- */
-function timeOf(k){const t=(k+1)/6;const d=Math.floor(t/24);return {day:Math.min(3,d+1),clock:hh(t-d*24),h:t};}
-function updateReadout(){const k=view.k,T=timeOf(k);
-  document.getElementById('rWhen').textContent=`Day ${T.day} · ${T.clock}`;document.getElementById('scrubOut').textContent=`Day ${T.day} ${T.clock}`;
+const sinceTxt=k=>{const t=(k+1)/6;return t<48?`${t.toFixed(1)} h`:`${Math.floor(t/24)} d ${Math.round(t%24)} h`;};
+function updateReadout(){const k=view.k,txt=sinceTxt(k);
+  document.getElementById('rWhen').textContent=`${txt} after lighting`;document.getElementById('scrubOut').textContent=txt;
   const R=result;if(!R)return;const s=R.ser,f=document.getElementById('rFire');
   if(s.fire[k]>0){f.textContent='Fire burning';f.classList.add('on');}
-  else{let j=k;while(j>=0&&s.fire[j]===0)j--;f.classList.remove('on');f.textContent=j<0?'Not lit yet':`Fire out ${((k-j)/6).toFixed(1)} h`;}
+  else{let j=k;while(j>=0&&s.fire[j]===0)j--;f.classList.remove('on');f.textContent=j<0?'Not lit yet':`Fire out ${sinceTxt(k-j-1)}`;}
   const o=(i,v)=>{document.getElementById(i).textContent=isFinite(v)?v.toFixed(v>=100?0:1)+' °C':'—';};
   o('rRoom',s.room[k]);o('rCore',s.core[k]);o('rBarrel',s.barrel[k]);o('rBench',s.benchTop[k]);o('rExit',s.exit[k]);o('rAir',s.air[k]);}
 
@@ -1081,55 +1062,56 @@ const scrub=document.getElementById('scrub');
 scrub.addEventListener('input',()=>{view.k=+scrub.value;updateColors();drawCharts();});
 let playT=null;
 document.getElementById('playBtn').addEventListener('click',e=>{if(playT){clearInterval(playT);playT=null;e.target.textContent='Play';return;}
-  e.target.textContent='Pause';playT=setInterval(()=>{view.k=(view.k+1)%432;scrub.value=view.k;updateColors();drawCharts();},70);});
+  e.target.textContent='Pause';playT=setInterval(()=>{view.k=(view.k+1)%(result?result.NK:1);scrub.value=view.k;updateColors();drawCharts();},45);});
 
 function setupCanvas(cv){const r=cv.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(10,r.width),h=Math.max(10,r.height);
   if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
   const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return {ctx,w,h};}
 const PL=40,PR=10;
+const runH=()=>result?result.hours:RUN_H,runK=()=>result?result.NK:RUN_H*6;
 function frame(ctx,w,h,pt,pb,ymin,ymax,unit,step){
-  const X=t=>PL+t/72*(w-PL-PR),Y=v=>pt+(1-(v-ymin)/(ymax-ymin))*(h-pt-pb);
+  const H=runH(),NK=runK(),X=t=>PL+t/H*(w-PL-PR),Y=v=>pt+(1-(v-ymin)/(ymax-ymin))*(h-pt-pb);
   const R=result;ctx.fillStyle=css('--c-fire');
-  if(R){let s=-1;for(let k=0;k<=432;k++){const on=k<432&&R.ser.fire[k]>0;if(on&&s<0)s=k;if(!on&&s>=0){ctx.fillRect(X(s/6),pt,X(k/6)-X(s/6),h-pt-pb);s=-1;}}}
+  if(R){let s=-1;for(let k=0;k<=NK;k++){const on=k<NK&&R.ser.fire[k]>0;if(on&&s<0)s=k;if(!on&&s>=0){ctx.fillRect(X(s/6),pt,X(k/6)-X(s/6),h-pt-pb);s=-1;}}}
   ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.fillStyle=css('--muted');ctx.font='10.5px "IBM Plex Mono",monospace';ctx.textAlign='right';ctx.textBaseline='middle';
   for(let v=Math.ceil(ymin/step)*step;v<=ymax+1e-6;v+=step){const y=Math.round(Y(v))+0.5;ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(w-PR,y);ctx.stroke();ctx.fillText(v+unit,PL-5,y);}
-  ctx.strokeStyle=css('--muted');ctx.globalAlpha=0.5;for(const d of [24,48]){const x=Math.round(X(d))+0.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,h-pb);ctx.stroke();}ctx.globalAlpha=1;
+  ctx.strokeStyle=css('--muted');ctx.globalAlpha=0.5;for(let d=24;d<H;d+=24){const x=Math.round(X(d))+0.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,h-pb);ctx.stroke();}ctx.globalAlpha=1;
   return {X,Y};}
 function line(ctx,X,Y,arr,color,width,dash){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash||[]);ctx.beginPath();let st=false;
   for(let k=0;k<arr.length;k++){const v=arr[k];if(!isFinite(v)){st=false;continue;}const x=X((k+1)/6),y=Y(v);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);}
 function cursorLine(ctx,X,h,pt,pb){const x=Math.round(X((view.k+1)/6))+0.5;ctx.strokeStyle=css('--ink');ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,h-pb);ctx.stroke();}
 function niceStep(range,target){const raw=range/target,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
-function drawCharts(){const R=result;
+function drawCharts(){const R=result,H=runH(),NK=runK();
   {const {ctx,w,h}=setupCanvas(document.getElementById('chartT'));if(!R)return;const s=R.ser;
-    let lo=S.outdoor,hi=S.target;for(let k=0;k<432;k++){lo=Math.min(lo,s.room[k]);hi=Math.max(hi,s.room[k]);if(isFinite(s.benchTop[k]))hi=Math.max(hi,s.benchTop[k]);}
+    let lo=S.outdoor,hi=S.target;for(let k=0;k<NK;k++){lo=Math.min(lo,s.room[k]);hi=Math.max(hi,s.room[k]);if(isFinite(s.benchTop[k]))hi=Math.max(hi,s.benchTop[k]);}
     if(baseline)for(const v of baseline.room){lo=Math.min(lo,v);hi=Math.max(hi,v);}
     const st=niceStep(hi-lo+4,3);lo=Math.floor((lo-1)/st)*st;hi=Math.ceil((hi+1)/st)*st;
     const {X,Y}=frame(ctx,w,h,14,4,lo,hi,'°',st);
     ctx.fillStyle=css('--muted');ctx.textAlign='left';ctx.textBaseline='top';ctx.font='600 11px "Barlow Condensed",sans-serif';
-    ['DAY 1','DAY 2','DAY 3'].forEach((t,i)=>ctx.fillText(t,X(i*24)+4,1));
-    ctx.strokeStyle=css('--c-out');ctx.setLineDash([4,3]);ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(X(0),Y(S.outdoor));ctx.lineTo(X(72),Y(S.outdoor));ctx.stroke();
-    ctx.globalAlpha=0.5;ctx.strokeStyle=css('--c-room');ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(X(0),Y(S.target));ctx.lineTo(X(72),Y(S.target));ctx.stroke();ctx.globalAlpha=1;ctx.setLineDash([]);
+    for(let d=0;d*24<H;d++)ctx.fillText('DAY '+(d+1),X(d*24)+4,1);
+    ctx.strokeStyle=css('--c-out');ctx.setLineDash([4,3]);ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(X(0),Y(S.outdoor));ctx.lineTo(X(H),Y(S.outdoor));ctx.stroke();
+    ctx.globalAlpha=0.5;ctx.strokeStyle=css('--c-room');ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(X(0),Y(S.target));ctx.lineTo(X(H),Y(S.target));ctx.stroke();ctx.globalAlpha=1;ctx.setLineDash([]);
     if(baseline){ctx.globalAlpha=0.6;line(ctx,X,Y,baseline.room,css('--c-room'),1.4,[5,3]);ctx.globalAlpha=1;}
     line(ctx,X,Y,s.benchTop,css('--c-bench'),1.6);line(ctx,X,Y,s.room,css('--c-room'),2.2);
     cursorLine(ctx,X,h,14,4);}
   {const {ctx,w,h}=setupCanvas(document.getElementById('chartP'));if(!R)return;const s=R.ser;
-    let hi=R.demand/1000;for(let k=0;k<432;k++)hi=Math.max(hi,(s.pBarrel[k]+s.pBench[k]+s.pPipe[k])/1000);
+    let hi=R.demand/1000;for(let k=0;k<NK;k++)hi=Math.max(hi,(s.pBarrel[k]+s.pBench[k]+s.pPipe[k])/1000);
     const st=niceStep(hi,3);hi=Math.ceil(hi/st)*st||1;
     const {X,Y}=frame(ctx,w,h,4,14,0,hi,'',st);
-    const layers=[['pBench','--c-bench'],['pPipe','--c-pipe'],['pBarrel','--c-barrel']];const base=new Float32Array(432);
+    const layers=[['pBench','--c-bench'],['pPipe','--c-pipe'],['pBarrel','--c-barrel']];const base=new Float32Array(NK);
     for(const [key,col] of layers){ctx.fillStyle=css(col);ctx.beginPath();ctx.moveTo(X(1/6),Y(base[0]));
-      for(let k=0;k<432;k++)ctx.lineTo(X((k+1)/6),Y((base[k]+Math.max(0,s[key][k]))/1000));
-      for(let k=431;k>=0;k--){ctx.lineTo(X((k+1)/6),Y(base[k]/1000));}ctx.closePath();ctx.globalAlpha=0.85;ctx.fill();ctx.globalAlpha=1;
-      for(let k=0;k<432;k++)base[k]+=Math.max(0,s[key][k]);}
-    ctx.strokeStyle=css('--ink');ctx.globalAlpha=0.55;ctx.setLineDash([4,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X(0),Y(R.demand/1000));ctx.lineTo(X(72),Y(R.demand/1000));ctx.stroke();ctx.setLineDash([]);
+      for(let k=0;k<NK;k++)ctx.lineTo(X((k+1)/6),Y((base[k]+Math.max(0,s[key][k]))/1000));
+      for(let k=NK-1;k>=0;k--){ctx.lineTo(X((k+1)/6),Y(base[k]/1000));}ctx.closePath();ctx.globalAlpha=0.85;ctx.fill();ctx.globalAlpha=1;
+      for(let k=0;k<NK;k++)base[k]+=Math.max(0,s[key][k]);}
+    ctx.strokeStyle=css('--ink');ctx.globalAlpha=0.55;ctx.setLineDash([4,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X(0),Y(R.demand/1000));ctx.lineTo(X(H),Y(R.demand/1000));ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle=css('--ink');ctx.textAlign='right';ctx.textBaseline='bottom';ctx.font='10.5px "IBM Plex Mono",monospace';ctx.fillText(`room needs ${(R.demand/1000).toFixed(1)} kW at ${S.target}°`,w-PR-2,Y(R.demand/1000)-2);ctx.globalAlpha=1;
     ctx.fillStyle=css('--muted');ctx.textAlign='center';ctx.textBaseline='top';
-    for(let t=0;t<=72;t+=6){ctx.fillText(t%24===0?(t===72?'72 h':'00'):String(t%24).padStart(2,'0'),X(t),h-12);}
+    for(let t=0;t<=H;t+=24){ctx.fillText(t===H?`${H} h`:`${t} h`,X(t)+(t===0?8:t===H?-14:0),h-12);}
     ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('kW',PL-5,Y(hi)+10);
     cursorLine(ctx,X,h,4,14);}
 }
 for(const cv of [document.getElementById('chartT'),document.getElementById('chartP')]){
-  const go=e=>{const r=cv.getBoundingClientRect();const t=(e.clientX-r.left-PL)/(r.width-PL-PR)*72;view.k=Math.max(0,Math.min(431,Math.round(t*6)-1));scrub.value=view.k;updateColors();drawCharts();};
+  const go=e=>{const r=cv.getBoundingClientRect();const t=(e.clientX-r.left-PL)/(r.width-PL-PR)*runH();view.k=Math.max(0,Math.min(runK()-1,Math.round(t*6)-1));scrub.value=view.k;updateColors();drawCharts();};
   cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);go(e);});
   cv.addEventListener('pointermove',e=>{if(e.buttons)go(e);});}
 

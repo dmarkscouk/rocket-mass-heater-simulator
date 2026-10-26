@@ -19,9 +19,10 @@ simulator in the document shell from `.github/pages/head.html` to make `index.ht
 
 ## What it reports
 
-- A 72-hour simulation with day 3 results: heat kept indoors, room range, comfortable hours,
-  bench-top and flue-exit peaks, draft margin, and where each day's wood energy goes.
-- A cool-down test: one 6-hour fire from 0 °C, then hours until the room is back to 1 °C.
+- One fire of a length you set, lit with everything at the outdoor temperature, followed for a week:
+  heat kept indoors, wood burned, room peak, hours until the room is back to outdoor + 1 °C,
+  comfortable hours, bench-top and flue-exit peaks, draft margin, and where the energy goes.
+- Every result is compared with a regular RMH (classic 8″ cob bench, steel drum) under the same fire, or with a design you pin.
 - Temperature-coloured 3D view and timeline you can scrub or play, plus a pinned baseline for comparisons.
 
 ## The model
