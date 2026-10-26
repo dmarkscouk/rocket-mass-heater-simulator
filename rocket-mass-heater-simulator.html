@@ -705,6 +705,24 @@ function clipShape(circ,i,j){
     for(let s=0;s<=16;s++){const an=a0+da*s/16;poly.push([ccx+r*Math.cos(an),ccy+r*Math.sin(an)]);}
     k=e-1;}
   shape.moveTo(poly[0][0],poly[0][1]);for(let k=1;k<poly.length;k++)shape.lineTo(poly[k][0],poly[k][1]);shape.closePath();return shape;}
+/* Exchanger air pipe: from the bottom of the chimney jacket it drops onto the bench, runs to the back row,
+   along the back past the drum or bell, and down into the feed tube, hugging the top of whatever it crosses. */
+function airPipeRoute(S,chPos){
+  const {x,y}=S.core,lift=0.055,fx=cx(x-2),fz=cz(y)+CELL/2,V=(a,b,c)=>new THREE.Vector3(a,b,c);
+  const topAt=(i,j)=>{if(!inGrid(i,j))return 0;let h=hgt(S.cells[id(i,j)])*DZ;if(isCore(S,i,j))h=Math.max(h,BASE_H);
+    if(isBarrel(S,i,j))h=Math.max(h,barrelBottom(S,sysParams(S))+sysParams(S).bH);return h+lift;};
+  if(!S.duct.length)return [V(chPos.x,1.75,chPos.z),V(fx,1.75,fz),V(fx,0.6,fz)];
+  const last=S.duct[S.duct.length-1],chI=ci(last),chJ=cj(last);
+  let back=y-1>=0?y-1:y+2;if(back===chJ)back=y+2<GH?y+2:y-1;
+  const s=Math.sign(back-chJ)||-1,cells=[];
+  for(let j=chJ+s;s>0?j<=back:j>=back;j+=s)cells.push([chI,j]);
+  for(let i=chI-1;i>=x-2;i--)cells.push([i,back]);
+  const pts=[V(chPos.x,1.72,chPos.z+s*0.17),V(chPos.x,topAt(cells[0][0],cells[0][1]),chPos.z+s*0.17)];
+  cells.forEach(([i,j],k)=>{const h=topAt(i,j);pts.push(V(cx(i),h,cz(j)));const n=cells[k+1];if(!n)return;
+    const bx=(cx(i)+cx(n[0]))/2,bz=(cz(j)+cz(n[1]))/2,hn=topAt(n[0],n[1]);pts.push(V(bx,h,bz),V(bx,hn,bz));});
+  const tail=pts[pts.length-1],hq=Math.max(tail.y,0.62);
+  pts.push(V(tail.x,hq,tail.z),V(fx,hq,fz),V(fx,0.56,fz));
+  return pts;}
 function disposeGroup(g){while(g.children.length){const o=g.children.pop();if(o.material&&o.material!==voxMat)o.material.dispose();}}
 function cyl(a,b,r,mat){const m=new THREE.Mesh(cylGeo,mat);const d=new THREE.Vector3().subVectors(b,a);m.scale.set(r,d.length(),r);
   m.position.copy(a).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());return m;}
@@ -758,9 +776,9 @@ function buildScene(){
   if(S.hx){const jacket=new THREE.Mesh(new THREE.CylinderGeometry(r+0.07,r+0.07,0.8,24),new THREE.MeshStandardMaterial({color:0xb8bcc0,metalness:0.6,roughness:0.35,transparent:true,opacity:0.45,depthWrite:false}));
     jacket.position.set(chPos.x,2.1,chPos.z);dynamic.add(jacket);
     hxAirMat=new THREE.MeshStandardMaterial({roughness:0.5,metalness:0.4});
-    const fx=cx(x-2),fz=cz(y)+CELL/2,a=new THREE.Vector3(chPos.x,1.75,chPos.z),b=new THREE.Vector3(fx,1.75,fz),c2=new THREE.Vector3(fx,0.6,fz);
-    dynamic.add(cyl(a,b,0.045,hxAirMat));dynamic.add(cyl(b,c2,0.045,hxAirMat));
-    const j=new THREE.Mesh(sphGeo,hxAirMat);j.scale.setScalar(0.045);j.position.copy(b);dynamic.add(j);}
+    const route=airPipeRoute(S,chPos);
+    for(let k=1;k<route.length;k++){if(route[k].distanceTo(route[k-1])<1e-4)continue;dynamic.add(cyl(route[k-1],route[k],0.045,hxAirMat));
+      const j=new THREE.Mesh(sphGeo,hxAirMat);j.scale.setScalar(0.045);j.position.copy(route[k]);dynamic.add(j);}}
   updateColors();
 }
 
