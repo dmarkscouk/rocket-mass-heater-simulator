@@ -186,6 +186,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <option value="overlong">Overlong flue run</option>
     </select>
   </div>
+  <div class="ctl-inline">
+    <label for="benchLen">Bench length</label>
+    <select id="benchLen" title="Rebuilds the bench and flue at this length. Keeps the core, firing and room settings."></select>
+  </div>
   <button class="btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
   <button class="btn" id="viewBtn">Reset view</button>
 </header>
@@ -290,9 +294,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <div class="tiles" id="tiles"></div>
       <div class="cool">
         <div class="lbl">Cool-down test <span class="v" id="coolKg"></span></div>
+        <div class="field"><div class="lbl">Fire length <output id="coolBurnOut"></output></div><input type="range" id="coolBurn" min="1" max="24" step="1" aria-label="Length of the one fire in the cool-down test"></div>
         <div class="tiles" id="coolTiles"></div>
         <div class="coolwrap"><canvas id="coolChart" aria-label="Room temperature for a week after one 6 hour fire"></canvas></div>
-        <p class="note">Everything starts at 0 °C indoors and out. One 6-hour fire, then no more. Time runs from when the fire goes out until the room is back down to 1 °C; it never quite reaches 0.</p>
+        <p class="note">Everything starts at 0 °C indoors and out. One fire of the length above, then no more. Time runs from when the fire goes out until the room is back down to 1 °C; it never quite reaches 0.</p>
       </div>
       <div>
         <div class="lbl">Where each day's wood goes</div>
@@ -418,7 +423,7 @@ const STARTS={1:[18],2:[7,18],3:[7,13,19]};
 
 /* ---------- state ---------- */
 function blank(){return {cells:new Array(GW*GH).fill(null),core:{x:2,y:1},duct:[],size:8,riserH:1.2,coreIns:'perlite',coreInsT:75,
-  burns:2,kg:9,cap:true,hx:false,hxEff:70,bell:0,house:'average',outdoor:5,target:19,floorIns:'50',chimney:1};}
+  burns:2,kg:9,cap:true,hx:false,hxEff:70,bell:0,benchN:0,coolBurn:6,house:'average',outdoor:5,target:19,floorIns:'50',chimney:1};}
 function isCore(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x-2&&i<=x+1;}
 function isBarrel(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x&&i<=x+1;}
 function adjBarrel(S,c){const i=ci(c),j=cj(c);if(isCore(S,i,j))return false;
@@ -434,8 +439,7 @@ const PRESETS={
   // insulating jacket around the drum and over its top, so the heat goes down the flue into the bench
   wrapped(){return wrapDrum(PRESETS.classic());},
   // a taller riser for draft, a deeper bench with 60 cm of cover and a 1.2 m backrest to soak up what the drum no longer radiates
-  bigwrapped(){const S=blank();S.riserH=1.5;S.kg=10;
-    fillRect(S,4,0,19,3,'cob',4);fillRect(S,4,0,19,0,'cob',8);route(S,[[4,1],[18,1],[18,2],[6,2]]);return wrapDrum(S);},
+  bigwrapped(){const S=blank();S.riserH=1.5;S.kg=10;return buildBench(S,2);},
   bigwrappedhx(){const S=PRESETS.bigwrapped();S.hx=true;S.hxEff=70;return S;},
   // the default layout: everything switched on
   full(){const S=PRESETS.bigwrappedhx();S.bell=1;sanitize(S);return S;},
@@ -449,6 +453,15 @@ function wrapDrum(S){const P=sysParams(S),{x,y}=S.core,top=Math.min(MAXL,Math.ce
     if(cur){const L=cur.L.slice();while(L.length<top)L.push(occAt(S,c,L.length)==='full'?null:'ceramic');S.cells[c]=trimCell(L);}
     else S.cells[c]=colFor(S,c,top,'ceramic');}
   return S;}
+/* Big bench with n flue passes running back and forth along a 4 m bench. Two passes (out and back) is the
+   standard length; more passes make the bench deeper, with 60 cm of cob over the flue and a 1.2 m backrest.
+   Replaces the mass and flue, keeps every other setting. */
+const BENCH_LENGTHS=[[2,'1×'],[3,'1.5×'],[4,'2×'],[5,'2.5×'],[6,'3×'],[8,'4×'],[10,'5×']];
+const benchCells=n=>15+14*(n-1);
+function buildBench(S,n){S.cells=new Array(GW*GH).fill(null);S.core={x:2,y:1};
+  fillRect(S,4,0,19,n+1,'cob',4);fillRect(S,4,0,19,0,'cob',8);
+  const w=[[4,1],[18,1]];for(let k=1;k<n;k++){w.push([k%2?18:6,k+1],[k%2?6:18,k+1]);}
+  route(S,w);S.benchN=n;return wrapDrum(S);}
 let S=load()||PRESETS.full();
 function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
   // older saves stored one material and a height per column
@@ -609,13 +622,15 @@ function simulate(S,opt){
 }
 
 // Cool-down test: start at 0 °C indoors and out, one 6-hour fire, then watch the room for a week
-const COOL_H=168,COOL_BURN=6,COOL_BACK=1;
-function coolDown(S){
-  const r=simulate(S,{hours:COOL_H,iv:[[0,COOL_BURN]],outdoor:0,T0:0,light:true}),room=r.ser.room;
-  let peak=-1e9,peakH=0,back=null;
-  for(let k=0;k<room.length;k++){const h=(k+1)/6;if(room[k]>peak){peak=room[k];peakH=h;}
-    if(back==null&&h>COOL_BURN&&room[k]<=COOL_BACK)back=h-COOL_BURN;}
-  return {room,peak,peakH,back,kg:r.Pfire*COOL_BURN*3600/15e6};}
+const COOL_H=168,COOL_BACK=1;
+function coolDown(S){const burn=S.coolBurn||6;
+  const r=simulate(S,{hours:COOL_H,iv:[[0,burn]],outdoor:0,T0:0,light:true}),room=r.ser.room;
+  let peak=-1e9,peakH=0,pk=0,back=null;
+  for(let k=0;k<room.length;k++)if(room[k]>peak){peak=room[k];peakH=(k+1)/6;pk=k;}
+  // count from the peak, since a heavy bench can keep the room near 0 °C until its stored heat comes through
+  if(peak<=COOL_BACK)back=0;
+  else for(let k=pk;k<room.length;k++)if(room[k]<=COOL_BACK){back=Math.max(0,(k+1)/6-burn);break;}
+  return {room,peak,peakH,back,burn,kg:r.Pfire*burn*3600/15e6};}
 
 /* ---------- colour ---------- */
 const STOPS=[[0,'#2c3e73'],[12,'#34609c'],[22,'#3f93a6'],[32,'#6fb98a'],[42,'#d2c257'],[55,'#eb9a3a'],[75,'#df5a2a'],[120,'#b8262a'],[300,'#d8451f'],[550,'#ff9a3d'],[850,'#ffe9b0']].map(([t,h])=>[t,new THREE.Color(h)]);
@@ -883,13 +898,16 @@ function syncBrush(){document.querySelectorAll('.opt .sw').forEach(b=>b.setAttri
   document.getElementById('hOut').textContent=(brushH*DZ*100).toFixed(0)+' cm';}
 syncBrush();
 
-document.getElementById('wrapBtn').addEventListener('click',()=>{if(!S.duct.length){flash('Draw a flue first.');return;}pushUndo();
+document.getElementById('wrapBtn').addEventListener('click',()=>{if(!S.duct.length){flash('Draw a flue first.');return;}pushUndo();S.benchN=0;
   for(const c of S.duct)for(const cc of brushCells(c,3))if(!isCore(S,ci(cc),cj(cc))&&!S.cells[cc])S.cells[cc]=colFor(S,cc,Math.max(2,brushH),brushM);
   for(const c of S.duct){const cell=S.cells[c];if(!cell)continue;while(hgt(cell)-ductLayer(cell)<2&&hgt(cell)<MAXL)cell.L.push(brushM);}changed();});
-document.getElementById('clearMass').addEventListener('click',()=>{pushUndo();S.cells.fill(null);changed();});
-document.getElementById('clearDuct').addEventListener('click',()=>{pushUndo();S.duct=[];changed();});
+document.getElementById('clearMass').addEventListener('click',()=>{pushUndo();S.cells.fill(null);S.benchN=0;changed();});
+document.getElementById('clearDuct').addEventListener('click',()=>{pushUndo();S.duct=[];S.benchN=0;changed();});
 document.getElementById('undoBtn').addEventListener('click',doUndo);document.getElementById('undoBtn').disabled=true;
 document.getElementById('viewBtn').addEventListener('click',resetView);
+(function(){const el=document.getElementById('benchLen');
+  el.innerHTML='<option value="0" disabled>Custom</option>'+BENCH_LENGTHS.map(([n,l])=>`<option value="${n}">${l} · ${(benchCells(n)*CELL).toFixed(1)} m flue</option>`).join('');
+  el.addEventListener('change',()=>{const n=+el.value;if(!n)return;pushUndo();buildBench(S,n);syncControls();changed();});})();
 document.getElementById('preset').addEventListener('change',e=>{const v=e.target.value;if(!v)return;pushUndo();S=PRESETS[v]();e.target.value='';syncControls();changed();});
 let lastHover=-1;
 const setShift=v=>{if(v===shiftDown)return;shiftDown=v;if(lastHover>=0)hoverAt(lastHover);};
@@ -916,6 +934,8 @@ document.getElementById('hx').addEventListener('change',e=>{pushUndo();S.hx=e.ta
 bindInput('hxEff','hxEff',1);
 const hh=h=>{const H=Math.floor(h),M=Math.round((h-H)*60);return String(H).padStart(2,'0')+':'+String(M).padStart(2,'0');};
 function syncControls(){
+  document.getElementById('benchLen').value=String(S.benchN||0);
+  document.getElementById('coolBurn').value=S.coolBurn;document.getElementById('coolBurnOut').textContent=S.coolBurn+' h';
   pressSeg(document.getElementById('sizeSeg'),S.size);pressSeg(document.getElementById('bellSeg'),S.bell?1:0);
   document.getElementById('bellNote').textContent=S.bell
     ?'A 114 mm firebrick box over the riser. It takes hours to heat, holds about 0.4 MJ/K, never warps, and keeps the burn space hot.'
@@ -937,7 +957,11 @@ function syncControls(){
 function updateDuctStat(){const DI=ductInfo(S);const el=document.getElementById('ductStat');
   el.textContent=DI.n?`${DI.L.toFixed(2)} m run · ${DI.bends} bend${DI.bends===1?'':'s'} · counts as ${DI.Leq.toFixed(1)} m of ~${DI.Lmax.toFixed(1)} m`:'No flue yet.';}
 
-function changed(painting,slider){sanitize(S);save();buildScene();if(!slider)updateDuctStat();dirty=true;
+function changed(painting,slider){
+  // a hand edit to the bench means it no longer matches a generated length
+  if(painting)S.benchN=0;
+  document.getElementById('benchLen').value=String(S.benchN||0);
+  sanitize(S);save();buildScene();if(!slider)updateDuctStat();dirty=true;
   document.getElementById('simStatus').textContent='Recalculating…';
   if(!painting)scheduleSim(slider?350:60);}
 function scheduleSim(delay){clearTimeout(simTimer);simTimer=setTimeout(runSim,delay);}
@@ -948,10 +972,14 @@ function runSim(){if(stroke){return;}const t0=performance.now();result=simulate(
   cool=null;renderCool();const gen=++coolGen;
   setTimeout(()=>{if(gen!==coolGen)return;cool=coolDown(S);renderCool();},30);}
 let cool=null,coolGen=0;
+// fire length only affects the cool-down test, so rerun just that
+(function(){const el=document.getElementById('coolBurn');let t=null;
+  el.addEventListener('input',()=>{S.coolBurn=+el.value;document.getElementById('coolBurnOut').textContent=S.coolBurn+' h';save();
+    clearTimeout(t);t=setTimeout(()=>{cool=null;renderCool();const gen=++coolGen;setTimeout(()=>{if(gen!==coolGen)return;cool=coolDown(S);renderCool();},30);},250);});})();
 function renderCool(){const C=cool,B=baseline&&baseline.cool,el=document.getElementById('coolTiles');
   if(!C){el.innerHTML='<div class="tile"><span class="t">Running a week of cooling…</span></div>';document.getElementById('coolKg').textContent='';drawCool();return;}
   document.getElementById('coolKg').textContent=`${C.kg.toFixed(0)} kg of wood`;
-  const backTxt=v=>v==null?`>${COOL_H-COOL_BURN}`:v.toFixed(0);
+  const backTxt=v=>v==null?`>${COOL_H-C.burn}`:v.toFixed(0);
   const d=(v,b,u)=>B&&v!=null&&b!=null?`<span class="d">baseline ${b.toFixed(0)}${u} (${v-b>=0?'+':''}${(v-b).toFixed(0)})</span>`:'';
   el.innerHTML=`<div class="tile"><span class="t">Room peaks at</span><span class="n">${C.peak.toFixed(1)}</span><span class="u">°C, ${C.peakH.toFixed(1)} h after lighting</span>${d(C.peak,B&&B.peak,'°')}</div>`+
     `<div class="tile"><span class="t">Back to ${COOL_BACK} °C after</span><span class="n">${backTxt(C.back)}</span><span class="u">hours once the fire is out</span>${d(C.back,B&&B.back,' h')}</div>`;
@@ -959,7 +987,7 @@ function renderCool(){const C=cool,B=baseline&&baseline.cool,el=document.getElem
 function drawCool(){const {ctx,w,h}=setupCanvas(document.getElementById('coolChart'));const C=cool;if(!C)return;
   const pl=26,pr=6,pt=6,pb=14,hi=Math.max(5,Math.ceil(Math.max(C.peak,baseline&&baseline.cool?baseline.cool.peak:0)/5)*5);
   const X=t=>pl+t/COOL_H*(w-pl-pr),Y=v=>pt+(1-v/hi)*(h-pt-pb);
-  ctx.fillStyle=css('--c-fire');ctx.fillRect(X(0),pt,X(COOL_BURN)-X(0),h-pt-pb);
+  ctx.fillStyle=css('--c-fire');ctx.fillRect(X(0),pt,X(C.burn)-X(0),h-pt-pb);
   ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.fillStyle=css('--muted');ctx.font='10px "IBM Plex Mono",monospace';
   ctx.textAlign='right';ctx.textBaseline='middle';
   for(const v of [0,hi/2,hi]){const y=Math.round(Y(v))+0.5;ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(w-pr,y);ctx.stroke();ctx.fillText(v+'°',pl-4,y);}
@@ -968,7 +996,7 @@ function drawCool(){const {ctx,w,h}=setupCanvas(document.getElementById('coolCha
     for(let k=0;k<arr.length;k++){const x=X((k+1)/6),y=Y(Math.max(0,arr[k]));k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.setLineDash([]);};
   if(baseline&&baseline.cool){ctx.globalAlpha=0.6;plot(baseline.cool.room,css('--c-room'),1.2,[4,3]);ctx.globalAlpha=1;}
   plot(C.room,css('--c-room'),1.8);
-  if(C.back!=null){const x=X(C.back+COOL_BURN),y=Y(COOL_BACK);ctx.fillStyle=css('--ink');ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}}
+  if(C.back!=null){const x=X(C.back+C.burn),y=Y(COOL_BACK);ctx.fillStyle=css('--ink');ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}}
 
 /* ---------- results ---------- */
 function renderResults(){const R=result;if(!R)return;const B=baseline;
