@@ -1,0 +1,1093 @@
+<title>Rocket Mass Heater Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: workshop console. Tool rail | 3D stage over a 72-hour timeline | results and build settings column */
+:root{
+  --bg:#e7eae5; --panel:#f5f6f3; --ink:#1d2321; --muted:#5b6662; --line:#cfd5cf; --accent:#c4651a; --accent-ink:#ffffff;
+  --scene:#dde2dc; --floor:#cbd2ca; --grid:#b3bcb3;
+  --good:#2c7a4b; --warn:#a87210; --bad:#b0392a;
+  --c-room:#c4651a; --c-bench:#7d5a37; --c-barrel:#3d5a80; --c-pipe:#7b8a32; --c-out:#8a9590;
+  --c-exh:#a2aaa6; --c-smoke:#5f534c; --c-ground:#cdb88c; --c-fire:rgba(196,101,26,.12);
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#131715; --panel:#1a1f1d; --ink:#e2e7e3; --muted:#93a09a; --line:#2b3330; --accent:#ec9a4b; --accent-ink:#1b1206;
+  --scene:#161b19; --floor:#1f2624; --grid:#313a37;
+  --good:#5cbf83; --warn:#e0b04a; --bad:#ef6b5a;
+  --c-room:#ec9a4b; --c-bench:#c9a27a; --c-barrel:#7fa6d6; --c-pipe:#b5c26a; --c-out:#7d8a85;
+  --c-exh:#5e6864; --c-smoke:#8d7b70; --c-ground:#7a6c52; --c-fire:rgba(236,154,75,.12);
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#131715; --panel:#1a1f1d; --ink:#e2e7e3; --muted:#93a09a; --line:#2b3330; --accent:#ec9a4b; --accent-ink:#1b1206;
+  --scene:#161b19; --floor:#1f2624; --grid:#313a37;
+  --good:#5cbf83; --warn:#e0b04a; --bad:#ef6b5a;
+  --c-room:#ec9a4b; --c-bench:#c9a27a; --c-barrel:#7fa6d6; --c-pipe:#b5c26a; --c-out:#7d8a85;
+  --c-exh:#5e6864; --c-smoke:#8d7b70; --c-ground:#7a6c52; --c-fire:rgba(236,154,75,.12);
+  color-scheme:dark; }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:12px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.02em;text-transform:uppercase;line-height:1;margin:0;text-wrap:balance}
+.brand small{display:block;font-family:var(--f-body);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);margin-top:3px}
+.top .spacer{flex:1}
+.ctl-inline{display:flex;align-items:center;gap:8px}
+.ctl-inline label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-family:var(--f-display);font-weight:600}
+select{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;max-width:100%}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 11px;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+
+.app{flex:1;min-height:0;display:grid;grid-template-columns:52px minmax(0,1fr) 340px;grid-template-rows:minmax(0,1fr) 226px;gap:10px}
+.rail{grid-row:1/3;display:flex;flex-direction:column;gap:6px}
+.tool{width:52px;height:52px;border-radius:8px;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+.tool svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.tool span{font-family:var(--f-display);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.tool[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.rail .sep{height:1px;background:var(--line);margin:4px 6px}
+
+.stage{position:relative;min-height:0;border-radius:10px;overflow:hidden;background:var(--scene);border:1px solid var(--line)}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.float{position:absolute;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:8px;padding:10px 12px;backdrop-filter:blur(6px)}
+.opts{top:10px;left:10px;width:248px;max-height:calc(100% - 20px);overflow:auto}
+.readout{top:10px;right:10px;min-width:190px}
+.viewctl{bottom:10px;right:10px;display:flex;flex-direction:column;gap:8px;width:220px}
+.hover{bottom:10px;left:10px;font-size:12px;max-width:260px;pointer-events:none}
+.lbl{font-family:var(--f-display);font-weight:600;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 5px;display:flex;justify-content:space-between;gap:8px}
+.lbl output,.lbl .v{font-family:var(--f-mono);text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500}
+.opt{display:flex;flex-direction:column;gap:10px}
+.opt p{margin:0;font-size:12.5px;color:var(--muted)}
+.opt .stat{font-family:var(--f-mono);font-size:12px;color:var(--ink)}
+.swatches{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.sw{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;border-radius:6px;padding:4px 6px;font-size:12px;text-align:left}
+.sw i{width:14px;height:14px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.15)}
+.sw[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;padding:5px 0;font-size:12px;font-family:var(--f-mono);border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row .btn{flex:1;font-size:12px;padding:5px 8px}
+
+.readout .when{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.03em;line-height:1.1}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:20px;padding:1px 8px;border:1px solid var(--line);color:var(--muted);margin-top:4px}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.chip.on::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.kv{display:grid;grid-template-columns:auto auto;gap:2px 14px;margin-top:8px;font-size:12px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.legend .scale{height:10px;border-radius:3px}
+.legend .ticks{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-top:2px}
+.toggles{display:flex;gap:6px;flex-wrap:wrap}
+.toggles label{display:flex;align-items:center;gap:5px;font-size:12px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+
+.timeline{grid-column:2;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px;display:flex;flex-direction:column;gap:4px}
+.tl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tl-head .lbl{margin:0}
+.keys{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.keys span{display:inline-flex;align-items:center;gap:5px}
+.keys i{width:12px;height:3px;border-radius:2px;display:inline-block}
+.keys i.dash{background:repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 7px)!important;height:2px}
+.keys i.box{height:9px;width:9px}
+.charts{flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:2px}
+.charts .cw{position:relative;min-height:0}
+/* absolutely placed so the canvas's own pixel size never feeds back into the grid row height */
+.charts canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:ew-resize;touch-action:none}
+.scrub{display:flex;align-items:center;gap:8px}
+.scrub .btn{padding:3px 10px}
+.scrub output{font-family:var(--f-mono);font-size:12px;min-width:92px;text-align:right}
+
+.side{grid-column:3;grid-row:1/3;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column}
+.side section{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:11px}
+.side section:last-child{border-bottom:0}
+.side h2,.side h3{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:0;line-height:1.1}
+.side h2{font-size:19px} .side h3{font-size:15px;color:var(--muted)}
+.res-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#simStatus{font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tile{border:1px solid var(--line);border-radius:7px;padding:8px 9px 7px;display:flex;flex-direction:column;gap:1px;position:relative;min-width:0}
+.tile .t{font-size:11.5px;color:var(--muted);padding-right:12px}
+.tile .n{font-family:var(--f-display);font-weight:700;font-size:25px;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.tile .u{font-size:11px;color:var(--muted)}
+.tile .d{font-family:var(--f-mono);font-size:10.5px;color:var(--muted)}
+.tile::after{content:"";position:absolute;top:10px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.tile.good::after{background:var(--good)} .tile.warn::after{background:var(--warn)} .tile.bad::after{background:var(--bad)}
+.cool{display:flex;flex-direction:column;gap:6px}
+.cool .tile::after{display:none}
+.coolwrap{position:relative;height:74px}
+.coolwrap canvas{position:absolute;inset:0;width:100%;height:100%}
+.bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--line)}
+.bar div{height:100%}
+.blegend{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12px}
+.blegend li{display:flex;align-items:center;gap:6px;min-width:0}
+.blegend i{width:9px;height:9px;border-radius:2px;flex:none}
+.blegend b{margin-left:auto;font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.warnings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.warnings li{font-size:12.5px;padding:7px 9px;border-radius:6px;border:1px solid var(--line);border-left-width:3px}
+.warnings li.bad{border-left-color:var(--bad)} .warnings li.warn{border-left-color:var(--warn)} .warnings li.good{border-left-color:var(--good)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field select{width:100%}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);margin:0}
+
+@media (max-width: 1000px){
+  body{overflow:auto;height:auto}
+  html{height:auto}
+  .app{display:flex;flex-direction:column}
+  .rail{flex-direction:row;flex-wrap:wrap}
+  .rail .sep{display:none}
+  .stage{height:62vh;min-height:360px;flex:none}
+  .timeline{height:250px;flex:none}
+  .side{overflow:visible}
+  .opts{width:200px}
+  .hover{display:none}
+}
+@media (max-width: 560px){
+  .stage{height:auto;min-height:0;overflow:visible;display:flex;flex-direction:column;gap:8px;background:transparent;border:0}
+  .stage canvas{height:52vh;min-height:300px;border-radius:10px;border:1px solid var(--line);background:var(--scene)}
+  .float{position:static;width:auto!important;max-height:none}
+  .readout{order:-1}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+
+<header class="top">
+  <h1 class="brand">Rocket Mass Heater Simulator<small>Draw the core, flue and bench. The model fires it for three days and shows where the heat goes.</small></h1>
+  <div class="spacer"></div>
+  <div class="ctl-inline">
+    <label for="preset">Start from</label>
+    <select id="preset">
+      <option value="">Choose a layout…</option>
+      <option value="classic">Classic 8″ cob bench</option>
+      <option value="compact">Compact 6″ cabin bench</option>
+      <option value="wrapped">8″ bench, insulated drum</option>
+      <option value="bigwrapped">Insulated drum, big bench</option>
+      <option value="bigwrappedhx">Insulated drum, big bench + exchanger</option>
+      <option value="granite">8″ bench in granite</option>
+      <option value="uninsulated">Uninsulated riser</option>
+      <option value="bare">Bare flue pipe, no mass</option>
+      <option value="overlong">Overlong flue run</option>
+    </select>
+  </div>
+  <button class="btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+  <button class="btn" id="viewBtn">Reset view</button>
+</header>
+
+<main class="app">
+  <nav class="rail" aria-label="Drawing tools">
+    <button class="tool" data-tool="mass" title="Paint thermal mass (M)"><svg viewBox="0 0 24 24"><path d="M3 15l9-4 9 4-9 4z"/><path d="M3 15v3l9 4 9-4v-3"/><path d="M7 10l5-2 5 2"/></svg><span>Mass</span></button>
+    <button class="tool" data-tool="duct" title="Route the flue (F)"><svg viewBox="0 0 24 24"><path d="M4 6h12a4 4 0 0 1 0 8H8a4 4 0 0 0 0 8h12"/></svg><span>Flue</span></button>
+    <button class="tool" data-tool="core" title="Place the core (C)"><svg viewBox="0 0 24 24"><rect x="11" y="4" width="9" height="16" rx="2"/><path d="M4 9v11h7"/><path d="M15.5 8v10"/></svg><span>Core</span></button>
+    <button class="tool" data-tool="erase" title="Erase mass (E)"><svg viewBox="0 0 24 24"><path d="M5 15l8-8 6 6-8 8H7z"/><path d="M9 11l6 6"/></svg><span>Erase</span></button>
+    <div class="sep"></div>
+    <button class="tool" data-tool="view" title="Look around (V)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.5" ry="8"/><path d="M4 12h16"/></svg><span>View</span></button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <canvas id="scene" aria-label="3D view of the rocket mass heater"></canvas>
+
+    <div class="float opts" id="opts">
+      <div class="opt" data-for="mass">
+        <div><div class="lbl">Thermal mass</div><div class="swatches" id="matSw"></div></div>
+        <div><div class="lbl">Insulation</div><div class="swatches" id="insSw"></div></div>
+        <div><div class="lbl">Placing</div><div class="seg" id="modeSeg"></div></div>
+        <div id="hWrap"><div class="lbl">Height <output id="hOut"></output></div><input type="range" id="hRange" min="1" max="12" step="1" aria-label="Column height"></div>
+        <div><div class="lbl">Brush</div><div class="seg" id="bSeg"></div></div>
+        <div class="row"><button class="btn" id="wrapBtn">Wrap flue</button><button class="btn" id="clearMass">Clear all</button></div>
+        <p id="massHint"></p>
+      </div>
+      <div class="opt" data-for="duct" hidden>
+        <p>Start next to the barrel and drag cell by cell. Drag back along the flue to shorten it, or Shift-click a flue cell to cut it off from there. The last cell is where the chimney rises. The flue sits on top of any insulation at the bottom of the bench.</p>
+        <div class="stat" id="ductStat"></div>
+        <div class="row"><button class="btn" id="clearDuct">Clear flue</button></div>
+      </div>
+      <div class="opt" data-for="core" hidden>
+        <p>Click to place the barrel. The burn tunnel and feed tube sit to its left. If the flue no longer meets the barrel it is cleared.</p>
+      </div>
+      <div class="opt" data-for="erase" hidden>
+        <div><div class="lbl">Brush</div><div class="seg" id="eSeg"></div></div>
+        <p>Click or drag to remove mass. Right-drag to orbit.</p>
+      </div>
+      <div class="opt" data-for="view" hidden>
+        <p>Drag to orbit, right-drag to pan, scroll or pinch to zoom.</p>
+      </div>
+    </div>
+
+    <div class="float readout" aria-live="polite">
+      <div class="when" id="rWhen">Day 3 · 19:30</div>
+      <span class="chip" id="rFire">Fire out</span>
+      <dl class="kv">
+        <dt>Room</dt><dd id="rRoom">–</dd>
+        <dt>Riser liner</dt><dd id="rCore">–</dd>
+        <dt id="rBarrelLbl">Drum</dt><dd id="rBarrel">–</dd>
+        <dt>Bench top (avg)</dt><dd id="rBench">–</dd>
+        <dt>Flue exit</dt><dd id="rExit">–</dd>
+        <dt id="rAirRow" hidden>Combustion air</dt><dd id="rAir" hidden>–</dd>
+      </dl>
+    </div>
+
+    <div class="float hover" id="hoverBox" hidden></div>
+
+    <div class="float viewctl">
+      <div class="legend">
+        <div class="lbl">Temperature <span class="v">°C</span></div>
+        <div class="scale" id="legendScale"></div>
+        <div class="ticks"><span>10</span><span>30</span><span>50</span><span>70</span><span>90</span></div>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="xray"> X-ray</label>
+        <label><input type="checkbox" id="matMode"> Show materials</label>
+      </div>
+      <div><div class="lbl">Layers shown <output id="peelOut">all</output></div><input type="range" id="peel" min="1" max="12" value="12"></div>
+    </div>
+  </div>
+
+  <section class="timeline" aria-label="72 hour timeline">
+    <div class="tl-head">
+      <div class="lbl">72 hours of firing</div>
+      <div class="keys">
+        <span><i style="background:var(--c-room)"></i>Room</span>
+        <span><i style="background:var(--c-bench)"></i>Bench top</span>
+        <span style="color:var(--c-out)"><i class="dash"></i>Outdoor</span>
+        <span id="baseKey" hidden style="color:var(--c-room)"><i class="dash"></i>Baseline room</span>
+        <span><i class="box" style="background:var(--c-barrel)"></i>Barrel kW</span>
+        <span><i class="box" style="background:var(--c-bench)"></i>Bench kW</span>
+        <span><i class="box" style="background:var(--c-pipe)"></i>Pipe kW</span>
+        <span><i class="box" style="background:var(--c-fire);outline:1px solid var(--c-room)"></i>Fire</span>
+      </div>
+    </div>
+    <div class="charts">
+      <div class="cw"><canvas id="chartT" aria-label="Room, bench and outdoor temperature over 72 hours"></canvas></div>
+      <div class="cw"><canvas id="chartP" aria-label="Heat given to the room over 72 hours"></canvas></div>
+    </div>
+    <div class="scrub">
+      <button class="btn" id="playBtn">Play</button>
+      <input type="range" id="scrub" min="0" max="431" value="404" aria-label="Time">
+      <output id="scrubOut"></output>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section>
+      <div class="res-head"><h2>Day 3 performance</h2><span id="simStatus"></span></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="cool">
+        <div class="lbl">Cool-down test <span class="v" id="coolKg"></span></div>
+        <div class="tiles" id="coolTiles"></div>
+        <div class="coolwrap"><canvas id="coolChart" aria-label="Room temperature for a week after one 6 hour fire"></canvas></div>
+        <p class="note">Everything starts at 0 °C indoors and out. One 6-hour fire, then no more. Time runs from when the fire goes out until the room is back down to 1 °C; it never quite reaches 0.</p>
+      </div>
+      <div>
+        <div class="lbl">Where each day's wood goes</div>
+        <div class="bar" id="bar"></div>
+        <ul class="blegend" id="blegend"></ul>
+      </div>
+      <ul class="warnings" id="warnings"></ul>
+      <div class="row"><button class="btn primary" id="pinBtn">Pin as baseline</button><button class="btn" id="clearPin" hidden>Clear baseline</button></div>
+    </section>
+
+    <section>
+      <h3>Core</h3>
+      <div class="field"><div class="lbl">System size</div><div class="seg" id="sizeSeg"><button data-v="6">6″</button><button data-v="8">8″</button></div></div>
+      <div class="field"><div class="lbl">Combustion chamber</div><div class="seg" id="bellSeg"><button data-v="0">Steel drum</button><button data-v="1">Firebrick bell</button></div>
+        <p class="note" id="bellNote"></p></div>
+      <div class="field"><div class="lbl">Heat riser height <output id="riserOut"></output></div><input type="range" id="riser" min="0.9" max="1.6" step="0.05"></div>
+      <div class="field"><label class="lbl" for="coreIns">Riser and burn tunnel insulation</label><select id="coreIns"></select></div>
+      <div class="field"><div class="lbl">Insulation thickness <output id="insTOut"></output></div><input type="range" id="insT" min="10" max="100" step="5"></div>
+    </section>
+
+    <section>
+      <h3>Exhaust heat exchanger</h3>
+      <label class="check"><input type="checkbox" id="hx"><span>Fit a counterflow exchanger on the chimney. Combustion air is drawn down a jacket round the exhaust pipe and into the feed tube, picking up heat the exhaust would have taken outside.</span></label>
+      <div class="field"><div class="lbl">Effectiveness <output id="hxOut"></output></div><input type="range" id="hxEff" min="40" max="85" step="5"></div>
+      <p class="note">Share of the exhaust's heat above room temperature handed to the incoming air. 60–75% is typical for a pipe-in-pipe design. It adds draft resistance equal to about 1.5 m of flue.</p>
+    </section>
+
+    <section>
+      <h3>Firing</h3>
+      <div class="field"><div class="lbl">Fires per day</div><div class="seg" id="burnSeg"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
+      <div class="field"><div class="lbl">Wood per fire <output id="kgOut"></output></div><input type="range" id="kg" min="2" max="20" step="0.5"></div>
+      <label class="check"><input type="checkbox" id="cap"><span>Cap the feed tube when the fire is out. Stops cold air being drawn through the warm mass overnight.</span></label>
+      <p class="note">Fires light at <span id="burnTimes"></span>. Seasoned hardwood at 15 MJ/kg.</p>
+    </section>
+
+    <section>
+      <h3>Room</h3>
+      <div class="field"><label class="lbl" for="house">Building</label><select id="house"></select></div>
+      <div class="field"><div class="lbl">Outdoor temperature <output id="outOut"></output></div><input type="range" id="outdoor" min="-15" max="15" step="1"></div>
+      <div class="field"><div class="lbl">Comfort target <output id="tgtOut"></output></div><input type="range" id="target" min="15" max="23" step="0.5"></div>
+      <div class="field"><label class="lbl" for="floorIns">Insulation under the bench</label><select id="floorIns"></select></div>
+      <div class="field"><div class="lbl">Exposed chimney pipe in room <output id="chOut"></output></div><input type="range" id="chimney" min="0" max="3" step="0.25"></div>
+    </section>
+
+    <section>
+      <h3>About the model</h3>
+      <p class="note">A lumped thermal model on a 25 cm grid with 15 cm layers. The fire heats the riser liner; combustion is cleaner as the liner passes ~450–850 °C. The barrel radiates to the room from whatever part of it is left bare. Blocks built against it are cut to fit round it and take heat from it in proportion to their conductivity, so insulation keeps the drum hot (which also burns off leftover smoke) and sends the heat on down the flue. Flue gas then gives heat to each mass cell it passes through, and the mass conducts it to the bench surface, the floor and its neighbours. Draft is judged against rule-of-thumb flue lengths (about 7.5 m for 6″, 12 m for 8″, plus 1.5 m per bend). Results are for comparing designs, not for sizing a build.</p>
+    </section>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+/* ---------- grid ---------- */
+const CELL=0.25, DZ=0.15, GW=24, GH=16, MAXL=12, BASE_H=0.30;
+const OX=GW*CELL/2, OZ=GH*CELL/2;
+const id=(i,j)=>j*GW+i, ci=c=>c%GW, cj=c=>(c/GW)|0;
+const inGrid=(i,j)=>i>=0&&j>=0&&i<GW&&j<GH;
+const cx=i=>(i+0.5)*CELL-OX, cz=j=>(j+0.5)*CELL-OZ;
+
+const MATS={
+  cob:{name:'Cob',rho:1600,cp:1000,k:0.8,color:'#b08d64'},
+  brick:{name:'Brick',rho:1900,cp:840,k:0.75,color:'#a4513a'},
+  stone:{name:'Granite',rho:2700,cp:790,k:2.8,color:'#8f9493'},
+  concrete:{name:'Concrete',rho:2300,cp:880,k:1.4,color:'#b9b6ad'},
+  sand:{name:'Sand fill',rho:1600,cp:830,k:0.35,color:'#d4bf8e'},
+  perlite:{name:'Perlite-clay',rho:450,cp:900,k:0.12,color:'#ece8de',ins:true},
+  ifb:{name:'Insulating firebrick',rho:750,cp:1000,k:0.25,color:'#e6c9a3',ins:true},
+  ceramic:{name:'Ceramic fibre board',rho:300,cp:1050,k:0.07,color:'#f6f3ec',ins:true},
+  wool:{name:'Mineral wool',rho:140,cp:840,k:0.04,color:'#e3cf6e',ins:true}
+};
+const hgt=cell=>cell?cell.L.length:0;
+// the flue sits on any insulation at the bottom of a column, in the first layer of real mass
+function ductLayer(cell){if(!cell)return 0;const i=cell.L.findIndex(m=>m&&!MATS[m].ins);return i<0?0:i;}
+const barrelBottom=(S,P)=>Math.max(BASE_H,S.riserH+0.06-P.bH);
+/* What occupies layer l of cell c: null (free), 'full' (no mass fits), or a circle {x,z,r} in world
+   coordinates that mass must wrap around (the drum, the manifold below it, or the chimney pipe). */
+function occAt(S,c,l){
+  const i=ci(c),j=cj(c),{x,y}=S.core,P=sysParams(S),y0=l*DZ,y1=y0+DZ;
+  if(j>=y&&j<=y+1&&i===x-2)return 'full';            // feed tube stays open for loading wood
+  if(isCore(S,i,j)&&y0<BASE_H-1e-6)return 'full';     // burn tunnel base
+  let circ=null;
+  // the drum (and the manifold ring below it) is a little wider than its 2×2 cells, so test every nearby cell
+  if(i>=x-1&&i<=x+2&&j>=y-1&&j<=y+2){const bb=barrelBottom(S,P),bt=bb+P.bH,X=cx(x)+CELL/2,Z=cz(y)+CELL/2;let r=0;
+    if(y1>BASE_H+1e-6&&y0<bb-1e-6)r=P.bR+0.055;if(y1>bb+1e-6&&y0<bt-1e-6)r=Math.max(r,P.bR);
+    const nx=Math.max(cx(i)-CELL/2,Math.min(X,cx(i)+CELL/2)),nz=Math.max(cz(j)-CELL/2,Math.min(Z,cz(j)+CELL/2));
+    if(r&&(nx-X)**2+(nz-Z)**2<r*r)circ={x:X,z:Z,r};}
+  const d=S.duct;if(d.length&&c===d[d.length-1]&&l>ductLayer(S.cells[c]))circ={x:cx(i),z:cz(j),r:P.D/2+0.01};
+  if(!circ)return null;
+  // slivers under 8% of the cell are treated as filled: too thin to build and too small to model stably
+  return areaFrac(circ,i,j)<0.08?'full':circ;}
+function areaFrac(circ,i,j){let n=0;for(let a=0;a<12;a++)for(let b=0;b<12;b++){const px=cx(i)-CELL/2+(a+0.5)*CELL/12,pz=cz(j)-CELL/2+(b+0.5)*CELL/12;
+  if((px-circ.x)**2+(pz-circ.z)**2>circ.r*circ.r)n++;}return n/144;}
+// share of the drum's side (arc) and top (disc) that lies over cell i,j
+function drumShare(S,i,j){const P=sysParams(S),X=cx(S.core.x)+CELL/2,Z=cz(S.core.y)+CELL/2,r=P.bR;
+  const inC=(px,pz)=>Math.abs(px-cx(i))<=CELL/2&&Math.abs(pz-cz(j))<=CELL/2;let a=0,d=0;
+  for(let s=0;s<120;s++){const t=s/120*2*Math.PI;if(inC(X+r*Math.cos(t),Z+r*Math.sin(t)))a++;}
+  for(let s=0;s<20;s++)for(let q=0;q<36;q++){const rr=r*Math.sqrt((s+0.5)/20),t=q/36*2*Math.PI;if(inC(X+rr*Math.cos(t),Z+rr*Math.sin(t)))d++;}
+  return {arc:a/120,disc:d/720};}
+function colFor(S,c,h,m){const L=[];for(let l=0;l<h;l++)L.push(occAt(S,c,l)==='full'?null:m);return L.some(Boolean)?{L}:null;}
+function trimCell(L){L=L.slice(0,MAXL);while(L.length&&!L[L.length-1])L.pop();return L.some(Boolean)?{L}:null;}
+// drop any block that a core part now fills, e.g. after the core moves or the riser changes height
+function sanitize(S){for(let c=0;c<GW*GH;c++){const cell=S.cells[c];if(!cell)continue;
+  S.cells[c]=trimCell(cell.L.map((m,l)=>m&&MATS[m]&&occAt(S,c,l)!=='full'?m:null));}}
+const CORE_INS={
+  none:{name:'None (bare firebrick)',k:1,rho:0},
+  ifb:{name:'Insulating firebrick',k:0.25,rho:750},
+  perlite:{name:'Perlite-clay',k:0.15,rho:550},
+  vermiculite:{name:'Vermiculite board',k:0.12,rho:400},
+  ceramic:{name:'Ceramic fibre blanket',k:0.09,rho:128}
+};
+const HOUSES={
+  // C: air plus the walls, floor and furniture that warm with the room
+  cabin:{name:'Small insulated cabin (70 W/K)',UA:70,C:4e6},
+  average:{name:'Average room (140 W/K)',UA:140,C:7e6},
+  draughty:{name:'Draughty old house (260 W/K)',UA:260,C:9e6}
+};
+const FLOOR={none:{name:'None, straight on the slab',U:2.2},'50':{name:'50 mm perlite',U:0.65},'100':{name:'100 mm perlite',U:0.38}};
+const STARTS={1:[18],2:[7,18],3:[7,13,19]};
+
+/* ---------- state ---------- */
+function blank(){return {cells:new Array(GW*GH).fill(null),core:{x:2,y:1},duct:[],size:8,riserH:1.2,coreIns:'perlite',coreInsT:75,
+  burns:2,kg:9,cap:true,hx:false,hxEff:70,bell:0,house:'average',outdoor:5,target:19,floorIns:'50',chimney:1};}
+function isCore(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x-2&&i<=x+1;}
+function isBarrel(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x&&i<=x+1;}
+function adjBarrel(S,c){const i=ci(c),j=cj(c);if(isCore(S,i,j))return false;
+  return [[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>isBarrel(S,i+a,j+b));}
+function adj4(a,b){return Math.abs(ci(a)-ci(b))+Math.abs(cj(a)-cj(b))===1;}
+function fillRect(S,x0,y0,x1,y1,m,h){for(let j=y0;j<=y1;j++)for(let i=x0;i<=x1;i++)if(inGrid(i,j)&&!isCore(S,i,j))S.cells[id(i,j)]={L:Array(h).fill(m)};}
+function route(S,wps){S.duct=[];let [x,y]=wps[0];S.duct.push(id(x,y));
+  for(let k=1;k<wps.length;k++){const [tx,ty]=wps[k];while(x!==tx){x+=Math.sign(tx-x);S.duct.push(id(x,y));}while(y!==ty){y+=Math.sign(ty-y);S.duct.push(id(x,y));}}}
+const PRESETS={
+  classic(){const S=blank();fillRect(S,4,0,18,3,'cob',3);route(S,[[4,1],[17,1],[17,2],[6,2]]);return S;},
+  compact(){const S=blank();S.size=6;S.riserH=1.1;S.kg=5;S.house='cabin';fillRect(S,4,0,13,3,'cob',3);route(S,[[4,1],[12,1],[12,2],[8,2]]);return S;},
+  granite(){const S=PRESETS.classic();S.cells=S.cells.map(c=>c&&{L:c.L.map(()=>'stone')});return S;},
+  // insulating jacket around the drum and over its top, so the heat goes down the flue into the bench
+  wrapped(){return wrapDrum(PRESETS.classic());},
+  // a taller riser for draft, a deeper bench with 60 cm of cover and a 1.2 m backrest to soak up what the drum no longer radiates
+  bigwrapped(){const S=blank();S.riserH=1.5;S.kg=10;
+    fillRect(S,4,0,19,3,'cob',4);fillRect(S,4,0,19,0,'cob',8);route(S,[[4,1],[18,1],[18,2],[6,2]]);return wrapDrum(S);},
+  bigwrappedhx(){const S=PRESETS.bigwrapped();S.hx=true;S.hxEff=70;return S;},
+  uninsulated(){const S=PRESETS.classic();S.coreIns='none';return S;},
+  bare(){const S=PRESETS.classic();S.cells.fill(null);return S;},
+  overlong(){const S=blank();fillRect(S,4,0,22,4,'cob',3);route(S,[[4,1],[21,1],[21,2],[5,2],[5,3],[21,3]]);return S;}
+};
+// ceramic fibre jacket round the drum and over its top; on the bench side it sits on the cob so the flue stays in mass
+function wrapDrum(S){const P=sysParams(S),{x,y}=S.core,top=Math.min(MAXL,Math.ceil((barrelBottom(S,P)+P.bH)/DZ)+1);
+  for(let j=y-1;j<=y+2;j++)for(let i=x-1;i<=x+2;i++){if(!inGrid(i,j))continue;const c=id(i,j),cur=S.cells[c];
+    if(cur){const L=cur.L.slice();while(L.length<top)L.push(occAt(S,c,L.length)==='full'?null:'ceramic');S.cells[c]=trimCell(L);}
+    else S.cells[c]=colFor(S,c,top,'ceramic');}
+  return S;}
+let S=load()||PRESETS.classic();
+function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
+  // older saves stored one material and a height per column
+  S.cells=S.cells.map(c=>c?trimCell((c.L||Array(c.h||0).fill(c.m)).map(m=>MATS[m]?m:null)):null);
+  sanitize(S);return S;}catch(e){return null;}}
+function save(){try{localStorage.setItem('rmh-sim-v1',JSON.stringify(S));}catch(e){}}
+
+/* ---------- physics ---------- */
+function sysParams(S){const P=S.size===8
+  ?{D:0.20,rate:4.0,Ab:1.8,Cb:8500,Lmax:12,bR:0.285,bH:0.88,liner:14,aIn:1.3,aOut:1.8}
+  :{D:0.15,rate:2.4,Ab:1.25,Cb:6000,Lmax:7.5,bR:0.23,bH:0.74,liner:9,aIn:0.95,aOut:1.3};
+  if(S.bell){
+    // firebrick bell over the riser: 114 mm dense firebrick walls and lid, modelled as an inner and an outer half
+    const t=0.114;P.bell=true;P.bR+=0.03;P.Ab=2*Math.PI*P.bR*P.bH+Math.PI*P.bR*P.bR;
+    const Cw=P.Ab*t*2000*880;P.Cb=Cw/2;P.Cout=Cw/2;P.Gio=1.2*P.Ab/(t/2);}
+  return P;}
+function ductInfo(S){const d=S.duct,n=d.length;let bends=0;const bend=new Uint8Array(n);
+  for(let k=1;k<n-1;k++){const a=d[k-1],b=d[k],c=d[k+1];
+    if(ci(b)-ci(a)!==ci(c)-ci(b)||cj(b)-cj(a)!==cj(c)-cj(b)){bends++;bend[k]=1;}}
+  // the exchanger's narrow annulus costs about as much draft as 1.5 m of extra flue
+  const P=sysParams(S),L=n*CELL,Leq=L+1.5*bends+(S.hx?1.5:0),Lmax=P.Lmax*Math.sqrt(S.riserH/1.2);
+  let bare=0,thin=0;for(const c of d){const cell=S.cells[c];if(!cell)bare++;else if(hgt(cell)-ductLayer(cell)<2)thin++;}
+  return {n,bends,bend,L,Leq,Lmax,margin:n?Lmax/Leq:3,bare,thin};}
+const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+const SIG=5.67e-8;
+function hrad(T1,T2){const a=T1+273.15,b=T2+273.15;return 0.9*SIG*(a*a+b*b)*(a+b);}
+
+/* opt (all optional): hours to run, iv to replace the daily fires with [[startH,endH],…], outdoor and T0 to
+   override the weather and start everything at one temperature, light to skip the per-cell snapshots */
+function simulate(S,opt){
+  opt=opt||{};const outdoor=opt.outdoor!=null?opt.outdoor:S.outdoor;
+  const P=sysParams(S),DI=ductInfo(S);
+  const rs=S.riserH/1.2,sc=0.4+0.6*rs;
+  const ins=CORE_INS[S.coreIns],tIns=S.coreIns==='none'?0:S.coreInsT/1000;
+  const aIn=P.aIn*sc,aOut=P.aOut*sc;
+  const Rcore=0.065/1.1+(tIns>0?tIns/ins.k:0)+1/15;
+  const UAloss=aOut/Rcore,UAin=aIn*45,UAbi=P.Ab*5;
+  // only the hot face of the liner and the inner part of the insulation swing with each fire
+  const Ccore=P.liner*900*sc+aOut*tIns*ins.rho*900*0.05;
+  const house=HOUSES[S.house],Ufl=FLOOR[S.floorIns].U,Tground=10;
+
+  // mass nodes
+  const nodeIdx=new Int32Array(GW*GH*MAXL).fill(-1);let n=0;
+  for(let c=0;c<GW*GH;c++){const cell=S.cells[c];if(!cell)continue;for(let l=0;l<hgt(cell);l++)if(cell.L[l])nodeIdx[c*MAXL+l]=n++;}
+  const C=new Float64Array(n),K=new Float64Array(n),F=new Float64Array(n),Gs=new Float64Array(n),Gg=new Float64Array(n);
+  const top=[],la=[],lb=[],lg=[];const Af=CELL*CELL,As=CELL*DZ,hS=8.5,chimC=S.duct.length?S.duct[S.duct.length-1]:-1;
+  // F: share of the cell's footprint the block fills once it is cut around a pipe or the drum
+  for(let c=0;c<GW*GH;c++)for(let l=0;l<MAXL;l++){const i=nodeIdx[c*MAXL+l];if(i<0)continue;const m=MATS[S.cells[c].L[l]],o=occAt(S,c,l);
+    F[i]=o?areaFrac(o,ci(c),cj(c)):1;C[i]=m.rho*m.cp*Af*DZ*F[i];K[i]=m.k;}
+  for(let c=0;c<GW*GH;c++){const cell=S.cells[c];if(!cell)continue;const x=ci(c),y=cj(c),ch=hgt(cell);
+    for(let l=0;l<ch;l++){const i=nodeIdx[c*MAXL+l];if(i<0)continue;
+      if(l===ch-1){Gs[i]+=hS*Af*F[i];if(c!==chimC&&!MATS[cell.L[l]].ins)top.push(i);}   // the chimney collar and insulated tops (like a drum jacket) are not seating
+      if(l===0)Gg[i]=Ufl*Af*F[i];
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;const j=inGrid(nx,ny)?nodeIdx[id(nx,ny)*MAXL+l]:-1;
+        if(j<0)Gs[i]+=hS*As*F[i];else if(dx===1||dy===1){la.push(i);lb.push(j);lg.push(Math.min(F[i],F[j])*As/(CELL/2/K[i]+CELL/2/K[j]));}}
+      if(l+1<ch){const j=nodeIdx[c*MAXL+l+1];if(j>=0){la.push(i);lb.push(j);lg.push(Math.min(F[i],F[j])*Af/(DZ/2/K[i]+DZ/2/K[j]));}}}}
+  // drum wrap: heat passes from the drum wall into each touching block through a contact film and half the
+  // block's thickness, so insulation holds the heat in while cob or brick soaks it up
+  const P0=P,bb=barrelBottom(S,P0),bt=bb+P0.bH,wrapN=[],wrapG=[];let Acov=0;
+  for(let jj=S.core.y-1;jj<=S.core.y+2;jj++)for(let ii=S.core.x-1;ii<=S.core.x+2;ii++){if(!inGrid(ii,jj))continue;const c=id(ii,jj),sh=drumShare(S,ii,jj);
+    if(!sh.arc&&!sh.disc)continue;
+    for(let l=0;l<MAXL;l++){const i=nodeIdx[c*MAXL+l];if(i<0)continue;const y0=l*DZ,y1=y0+DZ;
+      const ov=Math.max(0,Math.min(y1,bt)-Math.max(y0,bb));let A=sh.arc*2*Math.PI*P0.bR*ov;
+      if(y0>=bt-1e-6&&y0<bt+DZ-1e-6)A+=sh.disc*Math.PI*P0.bR*P0.bR;
+      if(A>0){wrapN.push(i);wrapG.push(A/(1/10+0.06/K[i]));Acov+=A;}}}
+  const AbRoom=Math.max(0.03*P0.Ab,P0.Ab-Acov);
+  // chimney: blocks around the rising pipe take heat from the flue gas before it leaves the room
+  const chimN=[];if(S.duct.length){const c=S.duct[S.duct.length-1],dl=ductLayer(S.cells[c]);
+    for(let l=dl+1;l<MAXL;l++){const i=nodeIdx[c*MAXL+l];if(i>=0)chimN.push(i);}}
+  const NL=la.length,LA=Int32Array.from(la),LB=Int32Array.from(lb),LG=Float64Array.from(lg);
+
+  // flue
+  const nd=DI.n,dNode=new Int32Array(nd),cov=new Float64Array(nd),UAd=new Float64Array(nd),UAair=new Float64Array(nd);
+  const A1=Math.PI*P.D*CELL,hIn=25,hOut=14;
+  for(let k=0;k<nd;k++){const c=S.duct[k],cell=S.cells[c],dl=ductLayer(cell);dNode[k]=nodeIdx[c*MAXL+dl];
+    cov[k]=dNode[k]>=0?(hgt(cell)-dl>=2?1:0.5):0;UAd[k]=hIn*A1*(DI.bend[k]?1.25:1);UAair[k]=1/(1/(hIn*A1)+1/(hOut*A1));}
+  const UAch=Math.max(0,S.chimney-chimN.length*DZ)/(1/(hIn*Math.PI*P.D)+1/(hOut*Math.PI*P.D)),UAchM=hIn*Math.PI*P.D*DZ;
+
+  // firing
+  const draftF=Math.min(1,Math.pow(Math.max(DI.margin,0.3),0.8));
+  const rate=P.rate*draftF,dur=S.kg/rate;
+  const burnKgS=rate/3600,Pfire=burnKgS*15e6,mBurn=burnKgS*13,mIdle=S.cap?0.0007:0.004,cpg=1150;
+  let iv=[];for(let d=0;d<3;d++)for(const s of STARTS[S.burns])iv.push([d*24+s,d*24+s+dur]);
+  if(opt.iv)iv=opt.iv;
+
+  const dt=20,NS=(opt.hours||72)*3600/dt,ME=3,SE=30,NK=NS/SE;
+  const T=new Float64Array(n),Qacc=new Float64Array(n),dQ=new Float64Array(n);
+  // start as if the heater has been in use for a while, so day 3 is close to a steady routine
+  T.fill(S.target+6);let Tr=S.target-2,Tc=Tr,Tb=Tr,To=Tr,Qsurf=0,Qground=0,TexPrev=Tr;
+  if(opt.T0!=null){T.fill(opt.T0);Tr=Tc=Tb=To=TexPrev=opt.T0;}
+  // counterflow exchanger: combustion air and exhaust carry about the same mass flow, so each side
+  // changes temperature by the same amount: effectiveness × (exhaust in − room)
+  const eps=S.hx?S.hxEff/100:0;let maxAir3=0;
+  const Tsnap=new Float32Array(opt.light?0:NK*n),gas=new Float32Array(nd),gasSnap=new Float32Array(opt.light?0:NK*nd);
+  const mk=()=>new Float32Array(NK);
+  const ser={room:mk(),benchTop:mk(),benchMax:mk(),exit:mk(),riserGas:mk(),core:mk(),barrel:mk(),pFire:mk(),pBarrel:mk(),pBench:mk(),pPipe:mk(),fire:mk(),air:mk()};
+  let aF=0,aB=0,aBe=0,aP=0,aFire=0,aExit=0,aRg=0,aAir=0;
+  const E={fuel:0,smoke:0,exh:0,barrel:0,bench:0,pipe:0,ground:0,rec:0};
+  const stored=()=>{let e=Ccore*Tc+P.Cb*Tb+(P.bell?P.Cout*To:0);for(let i=0;i<n;i++)e+=C[i]*T[i];return e;};
+  let E48=0,maxExit3=0,maxCore3=0,maxBarrel3=0,maxInner3=0,minEta=1;
+
+  for(let s=0;s<NS;s++){
+    const th=s*dt/3600;let firing=false;for(const v of iv)if(th>=v[0]&&th<v[1]){firing=true;break;}
+    if(s===48*3600/dt)E48=stored();
+    const m=firing?mBurn:mIdle,mcp=m*cpg,Qf=firing?Pfire:0;
+    // a hot drum acts as an afterburner: up to half of what the riser leaves unburnt is burnt out inside it
+    const eta0=(0.74+0.24*smooth(350,800,Tc))*(DI.margin<1?0.8+0.2*DI.margin:1);
+    const eta=firing?1-(1-eta0)*(1-0.5*smooth(450,700,Tb)):1;
+    const Tair=Tr+eps*Math.max(0,TexPrev-Tr);   // preheated by the previous step's exhaust
+    const Tad=Tair+(firing?eta*Qf/mcp:0);
+    const Tg1=Tc+(Tad-Tc)*Math.exp(-UAin/mcp);
+    const Qlin=mcp*(Tad-Tg1),Qcl=UAloss*(Tc-Tb);
+    Tc+=dt*(Qlin-Qcl)/Ccore;
+    const Tg2=Tb+(Tg1-Tb)*Math.exp(-UAbi/mcp),Qbin=mcp*(Tg1-Tg2);
+    // Ts: the face the room and any wrapping blocks see (the whole drum, or the outer half of a bell)
+    const Ts=P.bell?To:Tb,dTb=Ts-Tr,hb=1.4*Math.cbrt(Math.abs(dTb))+hrad(Ts,Tr),Qbr=AbRoom*hb*dTb;
+    let Qwrap=0;for(let w=0;w<wrapN.length;w++){const q=wrapG[w]*(Ts-T[wrapN[w]]);Qacc[wrapN[w]]+=q;Qwrap+=q;}
+    if(P.bell){const Qio=P.Gio*(Tb-To);Tb+=dt*(Qbin+Qcl-Qio)/P.Cb;To+=dt*(Qio-Qbr-Qwrap)/P.Cout;}
+    else Tb+=dt*(Qbin+Qcl-Qbr-Qwrap)/P.Cb;
+    let Tg=Tg2,Qpipe=0;
+    for(let k=0;k<nd;k++){gas[k]=Tg;const nn=dNode[k];
+      if(nn>=0){const Tm=T[nn],T2=Tm+(Tg-Tm)*Math.exp(-UAd[k]*cov[k]/mcp);Qacc[nn]+=mcp*(Tg-T2);Tg=T2;
+        if(cov[k]<1){const T3=Tr+(Tg-Tr)*Math.exp(-UAair[k]*(1-cov[k])/mcp);Qpipe+=mcp*(Tg-T3);Tg=T3;}}
+      else{const T3=Tr+(Tg-Tr)*Math.exp(-UAair[k]/mcp);Qpipe+=mcp*(Tg-T3);Tg=T3;}}
+    for(const nn of chimN){const Tm=T[nn],T2=Tm+(Tg-Tm)*Math.exp(-UAchM/mcp);Qacc[nn]+=mcp*(Tg-T2);Tg=T2;}
+    const TexIn=Tr+(Tg-Tr)*Math.exp(-UAch/mcp);Qpipe+=mcp*(Tg-TexIn);TexPrev=TexIn;
+    const Tex=Math.max(Tr,TexIn-(Tair-Tr)),Qrec=mcp*(Tair-Tr);
+    const Qexh=mcp*(Tex-Tr),Qsmoke=(1-eta)*Qf;
+
+    if((s+1)%ME===0){const dtm=dt*ME;
+      for(let i=0;i<n;i++){dQ[i]=Qacc[i]/ME;Qacc[i]=0;}
+      for(let l=0;l<NL;l++){const a=LA[l],b=LB[l],q=LG[l]*(T[a]-T[b]);dQ[a]-=q;dQ[b]+=q;}
+      Qsurf=0;Qground=0;
+      for(let i=0;i<n;i++){const qs=Gs[i]*(T[i]-Tr),qg=Gg[i]*(T[i]-Tground);dQ[i]-=qs+qg;Qsurf+=qs;Qground+=qg;T[i]+=dtm*dQ[i]/C[i];}}
+
+    Tr+=dt*(Qbr+Qpipe+Qsurf-house.UA*(Tr-outdoor))/house.C;
+
+    if(th>=48){E.rec+=Qrec*dt;if(firing)maxAir3=Math.max(maxAir3,Tair);E.fuel+=Qf*dt;E.smoke+=Qsmoke*dt;E.exh+=Qexh*dt;E.barrel+=Qbr*dt;E.bench+=Qsurf*dt;E.pipe+=Qpipe*dt;E.ground+=Qground*dt;
+      if(firing){maxExit3=Math.max(maxExit3,Tex);minEta=Math.min(minEta,eta);}maxCore3=Math.max(maxCore3,Tc);maxBarrel3=Math.max(maxBarrel3,Ts);maxInner3=Math.max(maxInner3,Tb);}
+    aF+=Qf;aB+=Qbr;aBe+=Qsurf;aP+=Qpipe;aFire+=firing?1:0;aExit+=Tex;aRg+=Tg1;aAir+=Tair;
+    if((s+1)%SE===0){const k=(s+1)/SE-1;
+      if(!opt.light){Tsnap.set(n?T:[],k*n);if(nd)gasSnap.set(gas,k*nd);}
+      let st=0,mx=-1e9;for(const i of top){st+=T[i];if(T[i]>mx)mx=T[i];}
+      ser.room[k]=Tr;ser.benchTop[k]=top.length?st/top.length:NaN;ser.benchMax[k]=top.length?mx:NaN;
+      ser.exit[k]=aExit/SE;ser.riserGas[k]=aRg/SE;ser.core[k]=Tc;ser.barrel[k]=P.bell?To:Tb;
+      ser.pFire[k]=aF/SE;ser.pBarrel[k]=aB/SE;ser.pBench[k]=aBe/SE;ser.pPipe[k]=aP/SE;ser.fire[k]=aFire/SE;
+      ser.air[k]=aAir/SE;aF=aB=aBe=aP=aFire=aExit=aRg=aAir=0;}
+  }
+  const dStore=stored()-E48;
+  let rmin=1e9,rmax=-1e9,hrs=0,bpk=-1e9;
+  for(let k=288;k<NK;k++){const r=ser.room[k];rmin=Math.min(rmin,r);rmax=Math.max(rmax,r);if(r>=S.target&&r<=S.target+4)hrs+=1/6;if(ser.benchMax[k]>bpk)bpk=ser.benchMax[k];}
+  const delivered=E.barrel+E.bench+E.pipe;
+  return {n,nodeIdx,Tsnap,gasSnap,nd,ductKey:S.duct.join(','),ser,NK,E,dStore,
+    // heat still soaking into a big mass on day 3 is kept indoors, just not released yet
+    eff:E.fuel?(delivered+Math.max(0,dStore))/E.fuel:0,roomMin:rmin,roomMax:rmax,hours:hrs,benchPeak:top.length?bpk:NaN,hasMass:top.length>0,
+    exitPeak:maxExit3,airPeak:maxAir3,recFrac:E.fuel?E.rec/E.fuel:0,corePeak:maxCore3,barrelPeak:maxBarrel3,innerPeak:maxInner3,drumCover:Math.min(1,Acov/P.Ab),smokeFrac:E.fuel?E.smoke/E.fuel:0,margin:DI.margin,Leq:DI.Leq,Lmax:DI.Lmax,DI,
+    dur,draftF,demand:house.UA*(S.target-S.outdoor),Pfire};
+}
+
+// Cool-down test: start at 0 °C indoors and out, one 6-hour fire, then watch the room for a week
+const COOL_H=168,COOL_BURN=6,COOL_BACK=1;
+function coolDown(S){
+  const r=simulate(S,{hours:COOL_H,iv:[[0,COOL_BURN]],outdoor:0,T0:0,light:true}),room=r.ser.room;
+  let peak=-1e9,peakH=0,back=null;
+  for(let k=0;k<room.length;k++){const h=(k+1)/6;if(room[k]>peak){peak=room[k];peakH=h;}
+    if(back==null&&h>COOL_BURN&&room[k]<=COOL_BACK)back=h-COOL_BURN;}
+  return {room,peak,peakH,back,kg:r.Pfire*COOL_BURN*3600/15e6};}
+
+/* ---------- colour ---------- */
+const STOPS=[[0,'#2c3e73'],[12,'#34609c'],[22,'#3f93a6'],[32,'#6fb98a'],[42,'#d2c257'],[55,'#eb9a3a'],[75,'#df5a2a'],[120,'#b8262a'],[300,'#d8451f'],[550,'#ff9a3d'],[850,'#ffe9b0']].map(([t,h])=>[t,new THREE.Color(h)]);
+const _c=new THREE.Color();
+function tempColor(t,out){out=out||_c;if(t<=STOPS[0][0])return out.copy(STOPS[0][1]);
+  for(let i=1;i<STOPS.length;i++)if(t<=STOPS[i][0]){const [a,ca]=STOPS[i-1],[b,cb]=STOPS[i];return out.copy(ca).lerp(cb,(t-a)/(b-a));}
+  return out.copy(STOPS[STOPS.length-1][1]);}
+(function(){const g=[];for(let t=10;t<=90;t+=5)g.push('#'+tempColor(t,new THREE.Color()).getHexString()+' '+((t-10)/80*100).toFixed(0)+'%');
+  document.getElementById('legendScale').style.background='linear-gradient(90deg,'+g.join(',')+')';})();
+
+/* ---------- three.js scene ---------- */
+const canvas=document.getElementById('scene'),stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,1,0.05,100);
+const controls=new THREE.OrbitControls(camera,canvas);
+controls.enableDamping=true;controls.maxPolarAngle=Math.PI*0.49;controls.minDistance=1.5;controls.maxDistance=16;
+function resetView(){camera.position.set(-0.6,4.6,5.4);controls.target.set(0.1,0.2,-0.9);controls.update();}
+resetView();
+scene.add(new THREE.HemisphereLight(0xffffff,0x606050,0.75));
+const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(-3,6,4);scene.add(sun);
+
+const floorMat=new THREE.MeshStandardMaterial({roughness:1});
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(GW*CELL,GH*CELL),floorMat);floor.rotation.x=-Math.PI/2;floor.position.y=-0.001;scene.add(floor);
+let grid=null;
+const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+
+const MAXI=GW*GH*MAXL;
+const voxMat=new THREE.MeshStandardMaterial({roughness:0.92,metalness:0});
+const vox=new THREE.InstancedMesh(new THREE.BoxGeometry(CELL*0.985,DZ*0.985,CELL*0.985),voxMat,MAXI);
+vox.setColorAt(0,new THREE.Color()); // allocates the colour buffer for all MAXI instances, so must precede count=0
+vox.frustumCulled=false;vox.count=0;scene.add(vox);
+let instCell=new Int32Array(MAXI),instLayer=new Int32Array(MAXI);
+
+const dynamic=new THREE.Group();scene.add(dynamic);
+const cylGeo=new THREE.CylinderGeometry(1,1,1,16),sphGeo=new THREE.SphereGeometry(1,14,10);
+let ductMeshes=[],chimneyMesh=null,hxAirMat=null,barrelMesh=null,riserMesh=null,insMesh=null;
+const cursor=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.22,depthWrite:false}));
+const cursorEdge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0xffffff}));
+cursor.add(cursorEdge);cursor.visible=false;scene.add(cursor);
+
+const view={xray:false,matMode:false,peel:MAXL,k:404};
+let tool='mass',brushM='cob',brushH=3,brushB=1,eraseB=1,brushMode='column',shiftDown=false;
+let result=null,baseline=null,simTimer=null,dirty=false;
+
+function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+function applyTheme(){
+  scene.background=new THREE.Color(css('--scene'));floorMat.color.set(css('--floor'));
+  if(grid)scene.remove(grid);
+  grid=new THREE.GridHelper(GW*CELL,GW,css('--grid'),css('--grid'));grid.scale.z=GH/GW;grid.position.y=0.001;scene.add(grid);
+  cursor.material.color.set(css('--accent'));cursorEdge.material.color.set(css('--accent'));
+  drawCharts();
+}
+
+const clipGroup=new THREE.Group();scene.add(clipGroup);
+/* Footprint of a cell with a circle cut out, in shape coordinates (x, -z) about the cell centre.
+   A circle wholly inside the cell becomes a hole; one crossing the edge is traced as an arc. */
+function clipShape(circ,i,j){
+  const h=CELL/2*0.985,ox=cx(i),oz=cz(j),ccx=circ.x-ox,ccy=-(circ.z-oz),r=circ.r,shape=new THREE.Shape();
+  if(Math.abs(ccx)+r<h&&Math.abs(ccy)+r<h){shape.moveTo(-h,-h);shape.lineTo(h,-h);shape.lineTo(h,h);shape.lineTo(-h,h);shape.closePath();
+    const hole=new THREE.Path();hole.absarc(ccx,ccy,r,0,Math.PI*2,true);shape.holes.push(hole);return shape;}
+  const corners=[[-h,-h],[h,-h],[h,h],[-h,h]],pts=[],N=40;
+  for(let e=0;e<4;e++){const a=corners[e],b=corners[(e+1)%4];for(let s=0;s<N;s++){const t=s/N;pts.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}}
+  const out=pts.map(p=>(p[0]-ccx)**2+(p[1]-ccy)**2>=r*r),M=pts.length,start=out.indexOf(true);if(start<0)return null;
+  const poly=[];
+  for(let k=0;k<M;k++){const idx=(start+k)%M;if(out[idx]){poly.push(pts[idx]);continue;}
+    let e=k;while(e<M&&!out[(start+e)%M])e++;
+    const A=poly[poly.length-1],B=pts[(start+e)%M];
+    const a0=Math.atan2(A[1]-ccy,A[0]-ccx);let da=Math.atan2(B[1]-ccy,B[0]-ccx)-a0;
+    while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+    for(let s=0;s<=16;s++){const an=a0+da*s/16;poly.push([ccx+r*Math.cos(an),ccy+r*Math.sin(an)]);}
+    k=e-1;}
+  shape.moveTo(poly[0][0],poly[0][1]);for(let k=1;k<poly.length;k++)shape.lineTo(poly[k][0],poly[k][1]);shape.closePath();return shape;}
+function disposeGroup(g){while(g.children.length){const o=g.children.pop();if(o.material&&o.material!==voxMat)o.material.dispose();}}
+function cyl(a,b,r,mat){const m=new THREE.Mesh(cylGeo,mat);const d=new THREE.Vector3().subVectors(b,a);m.scale.set(r,d.length(),r);
+  m.position.copy(a).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());return m;}
+
+function buildScene(){
+  // voxels
+  let k=0;const mtx=new THREE.Matrix4();
+  while(clipGroup.children.length){const o=clipGroup.children.pop();o.geometry.dispose();o.material.dispose();}
+  for(let c=0;c<GW*GH;c++){const cell=S.cells[c];if(!cell)continue;
+    for(let l=0;l<Math.min(hgt(cell),view.peel);l++){if(!cell.L[l])continue;const o=occAt(S,c,l);
+      if(o&&o!=='full'){const shape=clipShape(o,ci(c),cj(c));if(!shape)continue;
+        const g=new THREE.ExtrudeGeometry(shape,{depth:DZ*0.985,bevelEnabled:false,curveSegments:24});g.rotateX(-Math.PI/2);
+        const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({roughness:0.92,transparent:view.xray,opacity:view.xray?0.28:1,depthWrite:!view.xray}));
+        m.position.set(cx(ci(c)),l*DZ+DZ*0.0075,cz(cj(c)));m.userData={c,l};clipGroup.add(m);continue;}
+      mtx.makeTranslation(cx(ci(c)),DZ*(l+0.5),cz(cj(c)));vox.setMatrixAt(k,mtx);instCell[k]=c;instLayer[k]=l;k++;}}
+  vox.count=k;vox.instanceMatrix.needsUpdate=true;
+  voxMat.transparent=view.xray;voxMat.opacity=view.xray?0.28:1;voxMat.depthWrite=!view.xray;voxMat.needsUpdate=true;
+
+  disposeGroup(dynamic);ductMeshes=[];
+  const P=sysParams(S),{x,y}=S.core,r=P.D/2,yD=r+0.03;
+  // core base, feed tube, manifold, barrel, riser
+  const baseMat=new THREE.MeshStandardMaterial({color:0x9b7d5c,roughness:0.95});
+  const base=new THREE.Mesh(new THREE.BoxGeometry(4*CELL,BASE_H,2*CELL),baseMat);base.position.set((cx(x-2)+cx(x+1))/2,BASE_H/2,cz(y)+CELL/2);dynamic.add(base);
+  const feed=new THREE.Mesh(new THREE.BoxGeometry(P.D+0.1,0.55,P.D+0.1),new THREE.MeshStandardMaterial({color:0x6d5444,roughness:0.9}));
+  feed.position.set(cx(x-2),0.275,cz(y)+CELL/2);dynamic.add(feed);
+  const hole=new THREE.Mesh(new THREE.BoxGeometry(P.D,0.01,P.D),new THREE.MeshBasicMaterial({color:0x1a1210}));hole.position.set(cx(x-2),0.556,cz(y)+CELL/2);dynamic.add(hole);
+  const bx=cx(x)+CELL/2,bz=cz(y)+CELL/2;
+  const bBot=barrelBottom(S,P);
+  if(bBot>BASE_H){const man=new THREE.Mesh(new THREE.CylinderGeometry(P.bR+0.055,P.bR+0.055,bBot-BASE_H,32),baseMat);man.position.set(bx,BASE_H+(bBot-BASE_H)/2,bz);dynamic.add(man);}
+  const tIns=S.coreIns==='none'?0:S.coreInsT/1000;
+  riserMesh=new THREE.Mesh(new THREE.CylinderGeometry(r+0.04,r+0.04,S.riserH-0.2,20),new THREE.MeshStandardMaterial({roughness:0.8}));
+  riserMesh.position.set(bx,BASE_H+(S.riserH-0.2)/2,bz);dynamic.add(riserMesh);
+  insMesh=null;
+  if(tIns>0){insMesh=new THREE.Mesh(new THREE.CylinderGeometry(r+0.04+tIns,r+0.04+tIns,S.riserH-0.25,20),new THREE.MeshStandardMaterial({color:0xf2eee4,transparent:true,opacity:0.35,depthWrite:false}));
+    insMesh.position.copy(riserMesh.position);dynamic.add(insMesh);}
+  barrelMesh=new THREE.Mesh(new THREE.CylinderGeometry(P.bR,P.bR,P.bH,P.bell?40:32),
+    new THREE.MeshStandardMaterial({roughness:P.bell?0.95:0.5,metalness:P.bell?0:0.4,transparent:true,opacity:0.42,depthWrite:false}));
+  barrelMesh.position.set(bx,bBot+P.bH/2,bz);dynamic.add(barrelMesh);
+  // flue
+  const pts=S.duct.map(c=>new THREE.Vector3(cx(ci(c)),yD+ductLayer(S.cells[c])*DZ,cz(cj(c))));
+  if(pts.length){const c0=S.duct[0],i0=ci(c0),j0=cj(c0);let start=null;
+    for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]])if(isBarrel(S,i0+a,j0+b)){start=new THREE.Vector3(cx(i0)+a*CELL/2,pts[0].y,cz(j0)+b*CELL/2);break;}
+    const segs=[[start,pts[0]]];for(let k2=1;k2<pts.length;k2++)segs.push([pts[k2-1],pts[k2]]);
+    segs.forEach(([a,b],k2)=>{const mat=new THREE.MeshStandardMaterial({roughness:0.6,metalness:0.3});
+      const g=new THREE.Group();g.add(cyl(a,b,r,mat));const s=new THREE.Mesh(sphGeo,mat);s.scale.setScalar(r);s.position.copy(b);g.add(s);dynamic.add(g);ductMeshes.push(mat);});
+  }
+  const chPos=pts.length?pts[pts.length-1]:new THREE.Vector3(bx+P.bR+0.15,0,bz);
+  const chMat=new THREE.MeshStandardMaterial({roughness:0.5,metalness:0.4});
+  const ch=cyl(new THREE.Vector3(chPos.x,pts.length?chPos.y:yD,chPos.z),new THREE.Vector3(chPos.x,2.6,chPos.z),r+0.005,chMat);dynamic.add(ch);chimneyMesh=chMat;
+  hxAirMat=null;
+  if(S.hx){const jacket=new THREE.Mesh(new THREE.CylinderGeometry(r+0.07,r+0.07,0.8,24),new THREE.MeshStandardMaterial({color:0xb8bcc0,metalness:0.6,roughness:0.35,transparent:true,opacity:0.45,depthWrite:false}));
+    jacket.position.set(chPos.x,2.1,chPos.z);dynamic.add(jacket);
+    hxAirMat=new THREE.MeshStandardMaterial({roughness:0.5,metalness:0.4});
+    const fx=cx(x-2),fz=cz(y)+CELL/2,a=new THREE.Vector3(chPos.x,1.75,chPos.z),b=new THREE.Vector3(fx,1.75,fz),c2=new THREE.Vector3(fx,0.6,fz);
+    dynamic.add(cyl(a,b,0.045,hxAirMat));dynamic.add(cyl(b,c2,0.045,hxAirMat));
+    const j=new THREE.Mesh(sphGeo,hxAirMat);j.scale.setScalar(0.045);j.position.copy(b);dynamic.add(j);}
+  updateColors();
+}
+
+const tmpC=new THREE.Color();
+function updateColors(){
+  const R=result,k=view.k,valid=R&&R.ser;
+  const room=valid?R.ser.room[k]:15;
+  const blockColor=(c,l,out)=>{const cell=S.cells[c],mat=MATS[cell.L[l]];
+    if(!view.matMode&&valid){const nn=R.nodeIdx[c*MAXL+l];
+      if(nn>=0&&nn<R.n)tempColor(R.Tsnap[k*R.n+nn],out);else out.set(mat.color).multiplyScalar(0.7);
+      // material tint so materials stay readable; insulation gets a stronger one so it stands out
+      out.lerp(_mc.set(mat.color),mat.ins?0.4:0.12);
+    }else out.set(mat.color);
+    if(l===Math.min(hgt(cell),view.peel)-1&&l<hgt(cell)-1)out.multiplyScalar(0.85);return out;};
+  for(let i=0;i<vox.count;i++)vox.setColorAt(i,blockColor(instCell[i],instLayer[i],tmpC));
+  if(vox.instanceColor)vox.instanceColor.needsUpdate=true;
+  for(const m of clipGroup.children)blockColor(m.userData.c,m.userData.l,m.material.color);
+  const ductOK=valid&&R.ductKey===S.duct.join(',');
+  ductMeshes.forEach((m,i)=>{if(ductOK)tempColor(R.gasSnap[k*R.nd+i],m.color);else m.color.set(0x777777);});
+  if(chimneyMesh){if(valid)tempColor(R.ser.exit[k],chimneyMesh.color);else chimneyMesh.color.set(0x555555);}
+  if(hxAirMat){if(valid)tempColor(R.ser.air[k],hxAirMat.color);else hxAirMat.color.set(0x777777);}
+  if(barrelMesh){if(view.matMode&&S.bell)barrelMesh.material.color.set(0xd9b77e);
+    else if(valid)tempColor(R.ser.barrel[k],barrelMesh.material.color);else barrelMesh.material.color.set(S.bell?0xd9b77e:0x444444);
+    barrelMesh.material.opacity=view.xray||tool==='duct'?0.3:S.bell?0.92:0.75;}
+  if(riserMesh){if(valid)tempColor(R.ser.core[k],riserMesh.material.color);else riserMesh.material.color.set(0x8a6a50);}
+  updateReadout();
+}
+const _mc=new THREE.Color();
+
+function resize(){const r=canvas.getBoundingClientRect();const w=Math.max(50,r.width),h=Math.max(50,r.height);
+  renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(()=>{resize();drawCharts();}).observe(stage);
+(function loop(){controls.update();renderer.render(scene,camera);requestAnimationFrame(loop);})();
+
+/* ---------- pointer editing ---------- */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function pick(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);
+  if((tool==='mass'||tool==='erase')&&!view.xray){const h=ray.intersectObjects([vox,...clipGroup.children])[0];
+    if(h)return h.object===vox?(h.instanceId!=null?instCell[h.instanceId]:-1):h.object.userData.c;}
+  const p=new THREE.Vector3();if(ray.ray.intersectPlane(groundPlane,p)){const i=Math.floor((p.x+OX)/CELL),j=Math.floor((p.z+OZ)/CELL);if(inGrid(i,j))return id(i,j);}
+  return -1;}
+function brushCells(c,b){const out=[],o=-Math.floor((b-1)/2);for(let dj=0;dj<b;dj++)for(let di=0;di<b;di++){const i=ci(c)+o+di,j=cj(c)+o+dj;if(inGrid(i,j))out.push(id(i,j));}return out;}
+
+const undo=[];
+function pushUndo(){undo.push(JSON.stringify(S));if(undo.length>60)undo.shift();document.getElementById('undoBtn').disabled=false;}
+function doUndo(){if(!undo.length)return;S=Object.assign(blank(),JSON.parse(undo.pop()));document.getElementById('undoBtn').disabled=!undo.length;syncControls();changed();}
+
+let stroke=null;
+function applyAt(c,first){
+  if(c<0)return false;const i=ci(c),j=cj(c);
+  const stack=brushMode==='stack';
+  if(tool==='mass'&&!stroke.erase){let ch=false;for(const cc of brushCells(c,brushB)){const cur=S.cells[cc];
+      if(stack){if(stroke.done.has(cc))continue;stroke.done.add(cc);const L=cur?cur.L.slice():[];
+        while(L.length<MAXL&&occAt(S,cc,L.length)==='full')L.push(null);   // step over core parts that fill the cell
+        if(L.length<MAXL){L.push(brushM);S.cells[cc]=trimCell(L);ch=true;}}
+      else{const nc=colFor(S,cc,brushH,brushM);if(JSON.stringify(nc)!==JSON.stringify(cur)){S.cells[cc]=nc;ch=true;}}}return ch;}
+  if(tool==='erase'||(tool==='mass'&&stroke.erase)){let ch=false;const topOnly=tool==='mass'&&stack;
+    for(const cc of brushCells(c,tool==='mass'?brushB:eraseB)){const cur=S.cells[cc];if(!cur)continue;
+      if(topOnly){if(stroke.done.has(cc))continue;stroke.done.add(cc);S.cells[cc]=trimCell(cur.L.slice(0,-1));}else S.cells[cc]=null;ch=true;}
+    return ch;}
+  if(tool==='core'){if(!first||stroke.erase)return false;const nx=Math.min(GW-2,Math.max(2,i)),ny=Math.min(GH-2,Math.max(0,j));
+    if(nx===S.core.x&&ny===S.core.y)return false;S.core={x:nx,y:ny};
+    if(S.duct.length&&(!adjBarrel(S,S.duct[0])||S.duct.some(d=>isCore(S,ci(d),cj(d)))))S.duct=[];return true;}
+  if(tool==='duct'){const d=S.duct,pos=d.indexOf(c);if(isCore(S,i,j))return false;
+    if(stroke.erase){if(pos<0)return false;d.length=pos;return true;}
+    if(first){stroke.mode='extend';if(pos>=0){stroke.mode='trim';if(pos===d.length-1)d.pop();else d.length=pos+1;return true;}}
+    if(pos>=0){if(pos===d.length-2){d.pop();return true;}return false;}
+    if(stroke.mode==='trim')return false;
+    const ok=d.length?adj4(d[d.length-1],c):adjBarrel(S,c);if(ok){d.push(c);return true;}
+    if(first&&!d.length)flash('Start the flue in a cell touching the barrel.');
+    return false;}
+  return false;}
+canvas.addEventListener('pointerdown',e=>{
+  if(tool==='view'||e.button!==0)return;
+  if(e.pointerType==='touch'&&stroke){stroke=null;return;}
+  stroke={id:e.pointerId,last:-1,mode:'extend',snap:JSON.stringify(S),erase:e.shiftKey,done:new Set()};
+  const c=pick(e);stroke.last=c;if(applyAt(c,true)){undo.push(stroke.snap);document.getElementById('undoBtn').disabled=false;stroke.pushed=true;changed(true);}
+  canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{const c=pick(e);lastHover=c;shiftDown=e.shiftKey;hoverAt(c);
+  if(!stroke||stroke.id!==e.pointerId)return;if(c===stroke.last)return;stroke.last=c;
+  if(applyAt(c,false)){if(!stroke.pushed){undo.push(stroke.snap);stroke.pushed=true;document.getElementById('undoBtn').disabled=false;}changed(true);}});
+const endStroke=e=>{if(stroke&&stroke.id===e.pointerId){stroke=null;if(dirty)scheduleSim(0);}};
+canvas.addEventListener('pointerup',endStroke);canvas.addEventListener('pointercancel',endStroke);
+canvas.addEventListener('pointerleave',()=>{lastHover=-1;cursor.visible=false;document.getElementById('hoverBox').hidden=true;});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+function hoverAt(c){const hb=document.getElementById('hoverBox');
+  if(c<0||tool==='view'){cursor.visible=false;hb.hidden=true;return;}
+  const i=ci(c),j=cj(c);let w=1,d=1,h=0.04,x0=cx(i),z0=cz(j);
+  const del=shiftDown&&tool!=='core'&&tool!=='view'||tool==='erase';
+  cursor.material.color.set(css(del?'--bad':'--accent'));cursorEdge.material.color.set(css(del?'--bad':'--accent'));
+  if(tool==='mass'||tool==='erase'){const b=tool==='mass'?brushB:eraseB,o=-Math.floor((b-1)/2);w=d=b;x0=cx(i+o)+(b-1)*CELL/2;z0=cz(j+o)+(b-1)*CELL/2;
+    const ch=hgt(S.cells[c]);h=del?Math.max(1,ch)*DZ+0.02:brushMode==='stack'?Math.min(MAXL,ch+1)*DZ:brushH*DZ;}
+  if(tool==='core'){const nx=Math.min(GW-2,Math.max(2,i)),ny=Math.min(GH-2,Math.max(0,j));w=4;d=2;x0=cx(nx-2)+1.5*CELL;z0=cz(ny)+CELL/2;h=0.3;}
+  cursor.scale.set(w*CELL,h,d*CELL);cursor.position.set(x0,h/2,z0);cursor.visible=true;
+  const cell=S.cells[c],R=result,k=view.k;let html=`<b>Cell ${i+1}, ${j+1}</b>`;
+  if(isBarrel(S,i,j))html+=' · drum';else if(isCore(S,i,j))html+=' · core';
+  if(cell){const runs=[];for(const m of cell.L){const r=runs[runs.length-1];if(r&&r[0]===m)r[1]++;else runs.push([m,1]);}
+    html+=` · ${(hgt(cell)*DZ*100).toFixed(0)} cm<br>${runs.map(([m,n])=>`${m?MATS[m].name:'core'} ${n*15} cm`).reverse().join(' / ')}`;
+    if(R){const ids=cell.L.map((m,l)=>R.nodeIdx[c*MAXL+l]).filter(v=>v>=0&&v<R.n);
+      if(ids.length)html+=`<br>Top ${R.Tsnap[k*R.n+ids[ids.length-1]].toFixed(1)} °C · bottom ${R.Tsnap[k*R.n+ids[0]].toFixed(1)} °C`;}}
+  else if(!isCore(S,i,j))html+=' · empty floor';
+  const di=S.duct.indexOf(c);if(di>=0&&R&&R.ductKey===S.duct.join(','))html+=`<br>Flue gas ${R.gasSnap[k*R.nd+di].toFixed(0)} °C entering (cell ${di+1} of ${S.duct.length})`;
+  hb.innerHTML=html;hb.hidden=false;}
+
+let flashT=null;function flash(msg){const el=document.getElementById('simStatus');el.textContent=msg;el.style.color='var(--bad)';clearTimeout(flashT);flashT=setTimeout(()=>{el.style.color='';el.textContent=dirty?'Recalculating…':'';},2600);}
+
+/* ---------- tools & controls ---------- */
+function setTool(t){tool=t;document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
+  document.querySelectorAll('.opt').forEach(o=>o.hidden=o.dataset.for!==t);
+  const paint=t!=='view';
+  controls.mouseButtons={LEFT:paint?null:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:paint?THREE.MOUSE.ROTATE:THREE.MOUSE.PAN};
+  controls.touches={ONE:paint?null:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
+  cursor.visible=false;
+  const wantX=t==='duct';if(wantX!==view.xray&&(t==='duct'||view.autoX)){view.xray=wantX;view.autoX=wantX;document.getElementById('xray').checked=wantX;}
+  buildScene();updateDuctStat();}
+document.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
+
+const matSw=document.getElementById('matSw'),insSw=document.getElementById('insSw');
+for(const [k,m] of Object.entries(MATS)){const b=document.createElement('button');b.className='sw';b.dataset.m=k;b.innerHTML=`<i style="background:${m.color}"></i>${m.name}`;
+  b.title=`${m.name}: ${m.rho} kg/m³, k ${m.k} W/m·K`;b.addEventListener('click',()=>{brushM=k;syncBrush();});(m.ins?insSw:matSw).appendChild(b);}
+function segButtons(el,vals,labels,onPick){vals.forEach((v,i)=>{const b=document.createElement('button');b.dataset.v=v;b.textContent=labels[i];b.addEventListener('click',()=>onPick(v));el.appendChild(b);});}
+segButtons(document.getElementById('modeSeg'),['column','stack'],['Whole column','Stack blocks'],v=>{brushMode=v;syncBrush();});
+document.getElementById('hRange').addEventListener('input',e=>{brushH=+e.target.value;syncBrush();});
+segButtons(document.getElementById('bSeg'),[1,2,3],['1×1','2×2','3×3'],v=>{brushB=v;syncBrush();});
+segButtons(document.getElementById('eSeg'),[1,2,3],['1×1','2×2','3×3'],v=>{eraseB=v;syncBrush();});
+function pressSeg(el,v){el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v)===String(v)));}
+function syncBrush(){document.querySelectorAll('.opt .sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===brushM));
+  pressSeg(document.getElementById('modeSeg'),brushMode);document.getElementById('hWrap').hidden=brushMode==='stack';
+  document.getElementById('massHint').textContent=brushMode==='stack'
+    ?'Each click adds one 15 cm block on top. Shift-click removes the top block. Right-drag to orbit.'
+    :'Click or drag to build columns. Shift-click or Shift-drag to delete. Right-drag to orbit.';
+  document.getElementById('hRange').value=brushH;pressSeg(document.getElementById('bSeg'),brushB);pressSeg(document.getElementById('eSeg'),eraseB);
+  document.getElementById('hOut').textContent=(brushH*DZ*100).toFixed(0)+' cm';}
+syncBrush();
+
+document.getElementById('wrapBtn').addEventListener('click',()=>{if(!S.duct.length){flash('Draw a flue first.');return;}pushUndo();
+  for(const c of S.duct)for(const cc of brushCells(c,3))if(!isCore(S,ci(cc),cj(cc))&&!S.cells[cc])S.cells[cc]=colFor(S,cc,Math.max(2,brushH),brushM);
+  for(const c of S.duct){const cell=S.cells[c];if(!cell)continue;while(hgt(cell)-ductLayer(cell)<2&&hgt(cell)<MAXL)cell.L.push(brushM);}changed();});
+document.getElementById('clearMass').addEventListener('click',()=>{pushUndo();S.cells.fill(null);changed();});
+document.getElementById('clearDuct').addEventListener('click',()=>{pushUndo();S.duct=[];changed();});
+document.getElementById('undoBtn').addEventListener('click',doUndo);document.getElementById('undoBtn').disabled=true;
+document.getElementById('viewBtn').addEventListener('click',resetView);
+document.getElementById('preset').addEventListener('change',e=>{const v=e.target.value;if(!v)return;pushUndo();S=PRESETS[v]();e.target.value='';syncControls();changed();});
+let lastHover=-1;
+const setShift=v=>{if(v===shiftDown)return;shiftDown=v;if(lastHover>=0)hoverAt(lastHover);};
+window.addEventListener('keyup',e=>{if(e.key==='Shift')setShift(false);});
+window.addEventListener('blur',()=>setShift(false));
+window.addEventListener('keydown',e=>{if(e.key==='Shift'){setShift(true);return;}if(e.target.matches('input,select,textarea'))return;
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();doUndo();return;}
+  const m={m:'mass',f:'duct',c:'core',e:'erase',v:'view'}[e.key.toLowerCase()];if(m&&!e.metaKey&&!e.ctrlKey)setTool(m);});
+
+document.getElementById('xray').addEventListener('change',e=>{view.xray=e.target.checked;view.autoX=false;buildScene();});
+document.getElementById('matMode').addEventListener('change',e=>{view.matMode=e.target.checked;updateColors();});
+document.getElementById('peel').addEventListener('input',e=>{view.peel=+e.target.value;document.getElementById('peelOut').textContent=view.peel>=MAXL?'all':view.peel*15+' cm';buildScene();});
+
+const selFill=(el,obj)=>{for(const [k,v] of Object.entries(obj)){const o=document.createElement('option');o.value=k;o.textContent=v.name;el.appendChild(o);}};
+selFill(document.getElementById('coreIns'),CORE_INS);selFill(document.getElementById('house'),HOUSES);selFill(document.getElementById('floorIns'),FLOOR);
+function bindSeg(elId,key){const el=document.getElementById(elId);el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{pushUndo();S[key]=+b.dataset.v;syncControls();changed();}));}
+bindSeg('sizeSeg','size');bindSeg('bellSeg','bell');bindSeg('burnSeg','burns');
+function bindInput(elId,key,num){const el=document.getElementById(elId);el.addEventListener('input',()=>{S[key]=num?+el.value:el.value;syncControls();changed(false,true);});
+  el.addEventListener('change',()=>scheduleSim(0));}
+bindInput('riser','riserH',1);bindInput('insT','coreInsT',1);bindInput('kg','kg',1);bindInput('outdoor','outdoor',1);bindInput('target','target',1);bindInput('chimney','chimney',1);
+bindInput('coreIns','coreIns',0);bindInput('house','house',0);bindInput('floorIns','floorIns',0);
+document.getElementById('cap').addEventListener('change',e=>{S.cap=e.target.checked;changed();});
+document.getElementById('hx').addEventListener('change',e=>{pushUndo();S.hx=e.target.checked;syncControls();changed();});
+bindInput('hxEff','hxEff',1);
+const hh=h=>{const H=Math.floor(h),M=Math.round((h-H)*60);return String(H).padStart(2,'0')+':'+String(M).padStart(2,'0');};
+function syncControls(){
+  pressSeg(document.getElementById('sizeSeg'),S.size);pressSeg(document.getElementById('bellSeg'),S.bell?1:0);
+  document.getElementById('bellNote').textContent=S.bell
+    ?'A 114 mm firebrick box over the riser. It takes hours to heat, holds about 0.4 MJ/K, never warps, and keeps the burn space hot.'
+    :'A 55 or 30 gallon steel drum over the riser. It heats in minutes and radiates fast, but thin steel warps above about 650 °C.';
+  document.getElementById('rBarrelLbl').textContent=S.bell?'Bell surface':'Drum';pressSeg(document.getElementById('burnSeg'),S.burns);
+  const set=(i,v)=>{document.getElementById(i).value=v;};
+  set('riser',S.riserH);set('insT',S.coreInsT);set('kg',S.kg);set('outdoor',S.outdoor);set('target',S.target);set('chimney',S.chimney);
+  set('coreIns',S.coreIns);set('house',S.house);set('floorIns',S.floorIns);document.getElementById('cap').checked=S.cap;
+  document.getElementById('insT').disabled=S.coreIns==='none';
+  document.getElementById('hx').checked=S.hx;set('hxEff',S.hxEff);document.getElementById('hxEff').disabled=!S.hx;
+  document.getElementById('hxOut').textContent=S.hx?S.hxEff+'%':'off';
+  document.getElementById('rAirRow').hidden=document.getElementById('rAir').hidden=!S.hx;
+  const o=(i,t)=>{document.getElementById(i).textContent=t;};
+  o('riserOut',S.riserH.toFixed(2)+' m');o('insTOut',S.coreIns==='none'?'—':S.coreInsT+' mm');o('kgOut',S.kg+' kg');
+  o('outOut',S.outdoor+' °C');o('tgtOut',S.target+' °C');o('chOut',S.chimney+' m');
+  const P=sysParams(S),dur=S.kg/P.rate;
+  o('burnTimes',STARTS[S.burns].map(h=>hh(h)).join(', ')+` · about ${dur.toFixed(1)} h each at ${P.rate} kg/h`);
+  updateDuctStat();}
+function updateDuctStat(){const DI=ductInfo(S);const el=document.getElementById('ductStat');
+  el.textContent=DI.n?`${DI.L.toFixed(2)} m run · ${DI.bends} bend${DI.bends===1?'':'s'} · counts as ${DI.Leq.toFixed(1)} m of ~${DI.Lmax.toFixed(1)} m`:'No flue yet.';}
+
+function changed(painting,slider){sanitize(S);save();buildScene();if(!slider)updateDuctStat();dirty=true;
+  document.getElementById('simStatus').textContent='Recalculating…';
+  if(!painting)scheduleSim(slider?350:60);}
+function scheduleSim(delay){clearTimeout(simTimer);simTimer=setTimeout(runSim,delay);}
+function runSim(){if(stroke){return;}const t0=performance.now();result=simulate(S);dirty=false;
+  document.getElementById('simStatus').textContent=`${result.n} mass cells · ${Math.round(performance.now()-t0)} ms`;
+  updateColors();renderResults();drawCharts();
+  // the week-long test is slower, so it follows once the main results are on screen
+  cool=null;renderCool();const gen=++coolGen;
+  setTimeout(()=>{if(gen!==coolGen)return;cool=coolDown(S);renderCool();},30);}
+let cool=null,coolGen=0;
+function renderCool(){const C=cool,B=baseline&&baseline.cool,el=document.getElementById('coolTiles');
+  if(!C){el.innerHTML='<div class="tile"><span class="t">Running a week of cooling…</span></div>';document.getElementById('coolKg').textContent='';drawCool();return;}
+  document.getElementById('coolKg').textContent=`${C.kg.toFixed(0)} kg of wood`;
+  const backTxt=v=>v==null?`>${COOL_H-COOL_BURN}`:v.toFixed(0);
+  const d=(v,b,u)=>B&&v!=null&&b!=null?`<span class="d">baseline ${b.toFixed(0)}${u} (${v-b>=0?'+':''}${(v-b).toFixed(0)})</span>`:'';
+  el.innerHTML=`<div class="tile"><span class="t">Room peaks at</span><span class="n">${C.peak.toFixed(1)}</span><span class="u">°C, ${C.peakH.toFixed(1)} h after lighting</span>${d(C.peak,B&&B.peak,'°')}</div>`+
+    `<div class="tile"><span class="t">Back to ${COOL_BACK} °C after</span><span class="n">${backTxt(C.back)}</span><span class="u">hours once the fire is out</span>${d(C.back,B&&B.back,' h')}</div>`;
+  drawCool();}
+function drawCool(){const {ctx,w,h}=setupCanvas(document.getElementById('coolChart'));const C=cool;if(!C)return;
+  const pl=26,pr=6,pt=6,pb=14,hi=Math.max(5,Math.ceil(Math.max(C.peak,baseline&&baseline.cool?baseline.cool.peak:0)/5)*5);
+  const X=t=>pl+t/COOL_H*(w-pl-pr),Y=v=>pt+(1-v/hi)*(h-pt-pb);
+  ctx.fillStyle=css('--c-fire');ctx.fillRect(X(0),pt,X(COOL_BURN)-X(0),h-pt-pb);
+  ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.fillStyle=css('--muted');ctx.font='10px "IBM Plex Mono",monospace';
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(const v of [0,hi/2,hi]){const y=Math.round(Y(v))+0.5;ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(w-pr,y);ctx.stroke();ctx.fillText(v+'°',pl-4,y);}
+  ctx.textAlign='center';ctx.textBaseline='top';for(let d=1;d<=7;d++)ctx.fillText('D'+d,X((d-0.5)*24),h-11);
+  const plot=(arr,col,wd,dash)=>{ctx.strokeStyle=col;ctx.lineWidth=wd;ctx.setLineDash(dash||[]);ctx.beginPath();
+    for(let k=0;k<arr.length;k++){const x=X((k+1)/6),y=Y(Math.max(0,arr[k]));k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.setLineDash([]);};
+  if(baseline&&baseline.cool){ctx.globalAlpha=0.6;plot(baseline.cool.room,css('--c-room'),1.2,[4,3]);ctx.globalAlpha=1;}
+  plot(C.room,css('--c-room'),1.8);
+  if(C.back!=null){const x=X(C.back+COOL_BURN),y=Y(COOL_BACK);ctx.fillStyle=css('--ink');ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}}
+
+/* ---------- results ---------- */
+function renderResults(){const R=result;if(!R)return;const B=baseline;
+  const delta=(v,b,d,u)=>B&&isFinite(b)&&isFinite(v)?`<span class="d">baseline ${b.toFixed(d)}${u||''} (${v-b>=0?'+':''}${(v-b).toFixed(d)})</span>`:'';
+  const ex=R.exitPeak;
+  const tiles=[
+    {t:'Heat kept indoors',n:Math.round(R.eff*100),u:'% of the wood’s energy',s:R.eff>=0.8?'good':R.eff>=0.65?'warn':'bad',d:delta(R.eff*100,B&&B.eff*100,0,'%')},
+    {t:'Room on day 3',n:`${R.roomMin.toFixed(1)}–${R.roomMax.toFixed(1)}`,u:'°C, coldest to warmest',s:R.roomMin>=S.target-1.5?'good':R.roomMax>=S.target?'warn':'bad',d:delta(R.roomMin,B&&B.roomMin,1,' min')},
+    {t:'Hours comfortable',n:R.hours.toFixed(1),u:`of 24 h at ${S.target}–${S.target+4} °C`,s:R.hours>=20?'good':R.hours>=12?'warn':'bad',d:delta(R.hours,B&&B.hours,1,' h')},
+    {t:'Bench top peak',n:R.hasMass?Math.round(R.benchPeak):'—',u:R.hasMass?'°C, hottest surface cell':'no mass drawn',s:!R.hasMass?'bad':R.benchPeak>65?'bad':R.benchPeak<28?'warn':'good',d:R.hasMass?delta(R.benchPeak,B&&B.benchPeak,0,'°'):''},
+    {t:'Flue exit peak',n:Math.round(ex),u:'°C leaving to outside',s:ex>220?'bad':(ex>150||ex<45)?'warn':'good',d:delta(ex,B&&B.exitPeak,0,'°')},
+    {t:'Draft margin',n:R.margin>=2.5?'Ample':R.margin.toFixed(2)+'×',u:R.DI.n?`${R.Leq.toFixed(1)} m equivalent of ~${R.Lmax.toFixed(1)} m`:'no flue drawn',s:R.margin>=1.15?'good':R.margin>=1?'warn':'bad',d:''}
+  ];
+  document.getElementById('tiles').innerHTML=tiles.map(x=>`<div class="tile ${x.s}"><span class="t">${x.t}</span><span class="n">${x.n}</span><span class="u">${x.u}</span>${x.d}</div>`).join('');
+  const E=R.E,f=E.fuel||1;
+  const parts=[[S.bell?'Bell radiant':'Drum radiant',E.barrel,'--c-barrel'],['Bench (stored)',E.bench,'--c-bench'],['Bare pipe',E.pipe,'--c-pipe'],
+    ['Up the chimney',Math.max(0,E.exh),'--c-exh'],['Unburnt smoke',E.smoke,'--c-smoke'],['Into the floor',Math.max(0,E.ground),'--c-ground']];
+  const ds=R.dStore;if(ds>0)parts.push(['Still in the mass',ds,'--line']);
+  const tot=parts.reduce((a,p)=>a+p[1],0)||1;
+  document.getElementById('bar').innerHTML=parts.map(p=>`<div title="${p[0]} ${(p[1]/f*100).toFixed(1)}%" style="width:${p[1]/tot*100}%;background:var(${p[2]})"></div>`).join('');
+  document.getElementById('blegend').innerHTML=parts.map(p=>`<li><i style="background:var(${p[2]})"></i>${p[0]}<b>${(p[1]/f*100).toFixed(0)}%</b></li>`).join('');
+  // warnings
+  const W=[],DI=R.DI,P=sysParams(S);
+  if(!DI.n)W.push(['bad','There is no flue. The barrel vents straight up the chimney, so most of the heat that the barrel misses is lost. Use the Flue tool to route it through mass.']);
+  if(DI.n&&R.margin<1)W.push(['bad',`The flue counts as ${R.Leq.toFixed(1)} m against roughly ${R.Lmax.toFixed(1)} m for a ${S.size}″ system with this riser. Expect smoke-back and a lazy, smoky burn. Shorten the run, cut bends, raise the riser or go up a size.`]);
+  else if(DI.n&&R.margin<1.15)W.push(['warn','The flue is near the limit for this system. It may struggle on cold starts.']);
+  if(R.corePeak<650)W.push(['bad',`The riser liner only reaches ${Math.round(R.corePeak)} °C. A rocket core needs to run hot (above ~800 °C) to burn its smoke. Insulate the riser.`]);
+  else if(R.corePeak<800)W.push(['warn',`The riser liner peaks at ${Math.round(R.corePeak)} °C. More or better insulation would burn cleaner.`]);
+  if(S.bell)W.push(['good',`The firebrick bell runs up to ${Math.round(R.innerPeak)} °C inside and ${Math.round(R.barrelPeak)} °C on its outer face, which keeps radiating long after the fire is out.`]);
+  if(!S.bell&&R.barrelPeak>650)W.push(['bad',`The drum reaches ${Math.round(R.barrelPeak)} °C. A thin steel drum warps and scales above about 650 °C. Leave part of it bare, use heavier steel, or build a firebrick bell instead.`]);
+  if(S.hx)W.push(['good',`The exchanger warms the combustion air to up to ${Math.round(R.airPeak)} °C and hands ${(R.recFrac*100).toFixed(0)}% of the wood’s energy back to the fire.`]);
+  if(R.drumCover>0.3)W.push(['good',`${Math.round(R.drumCover*100)}% of the ${S.bell?'bell':'drum'} is wrapped. Heat it would have radiated now goes to the mass around it or down the flue.`]);
+  if(R.smokeFrac>0.08)W.push(['warn',`${(R.smokeFrac*100).toFixed(0)}% of the wood’s energy leaves as unburnt smoke.`]);
+  if(DI.bare)W.push(['warn',`${(DI.bare*CELL).toFixed(2)} m of flue runs through open air. It warms the room quickly but stores nothing.`]);
+  if(DI.thin)W.push(['warn',`${(DI.thin*CELL).toFixed(2)} m of flue has under 30 cm of mass around it. Half of that heat goes straight to the room.`]);
+  if(R.hasMass&&R.benchPeak>65)W.push(['bad',`The bench top reaches ${Math.round(R.benchPeak)} °C, too hot to sit on. Add a layer above the flue or use a slower-conducting material.`]);
+  else if(R.hasMass&&R.benchPeak<28&&DI.n)W.push(['warn',`The bench top barely warms (${Math.round(R.benchPeak)} °C). The mass may be too big or too thick for the wood you burn.`]);
+  if(DI.n&&R.exitPeak>150)W.push(['warn',`Flue gas leaves at up to ${Math.round(R.exitPeak)} °C. A longer run through mass would keep that heat.`]);
+  if(DI.n&&R.exitPeak<45)W.push(['warn',`Flue gas leaves at only ${Math.round(R.exitPeak)} °C. Expect condensation in the chimney and a weak draft on cold days.`]);
+  const st0=STARTS[S.burns],minGap=Math.min(...st0.map((h,i)=>((st0[(i+1)%st0.length]-h)+24)%24||24));
+  if(R.dur>minGap)W.push(['warn','Each fire runs into the next one. Burn less wood per fire.']);
+  const avgKW=R.Pfire*R.dur*S.burns/24/1000;
+  if(avgKW<R.demand/1000*0.8)W.push(['warn',`The wood supplies about ${avgKW.toFixed(1)} kW on average, but the room needs about ${(R.demand/1000).toFixed(1)} kW to hold ${S.target} °C. Burn more wood or insulate the building.`]);
+  if(!W.length)W.push(['good','No problems found. The core burns hot, the flue draws and the bench holds a comfortable temperature.']);
+  document.getElementById('warnings').innerHTML=W.map(w=>`<li class="${w[0]}">${w[1]}</li>`).join('');
+}
+document.getElementById('pinBtn').addEventListener('click',()=>{if(!result)return;const R=result;
+  baseline={eff:R.eff,roomMin:R.roomMin,hours:R.hours,benchPeak:R.benchPeak,exitPeak:R.exitPeak,room:R.ser.room.slice(),cool};
+  document.getElementById('clearPin').hidden=false;document.getElementById('baseKey').hidden=false;document.getElementById('pinBtn').textContent='Re-pin baseline';renderResults();drawCharts();renderCool();});
+document.getElementById('clearPin').addEventListener('click',()=>{baseline=null;document.getElementById('clearPin').hidden=true;document.getElementById('baseKey').hidden=true;
+  document.getElementById('pinBtn').textContent='Pin as baseline';renderResults();drawCharts();renderCool();});
+
+/* ---------- readout & timeline ---------- */
+function timeOf(k){const t=(k+1)/6;const d=Math.floor(t/24);return {day:Math.min(3,d+1),clock:hh(t-d*24),h:t};}
+function updateReadout(){const k=view.k,T=timeOf(k);
+  document.getElementById('rWhen').textContent=`Day ${T.day} · ${T.clock}`;document.getElementById('scrubOut').textContent=`Day ${T.day} ${T.clock}`;
+  const R=result;if(!R)return;const s=R.ser,f=document.getElementById('rFire');
+  if(s.fire[k]>0){f.textContent='Fire burning';f.classList.add('on');}
+  else{let j=k;while(j>=0&&s.fire[j]===0)j--;f.classList.remove('on');f.textContent=j<0?'Not lit yet':`Fire out ${((k-j)/6).toFixed(1)} h`;}
+  const o=(i,v)=>{document.getElementById(i).textContent=isFinite(v)?v.toFixed(v>=100?0:1)+' °C':'—';};
+  o('rRoom',s.room[k]);o('rCore',s.core[k]);o('rBarrel',s.barrel[k]);o('rBench',s.benchTop[k]);o('rExit',s.exit[k]);o('rAir',s.air[k]);}
+
+const scrub=document.getElementById('scrub');
+scrub.addEventListener('input',()=>{view.k=+scrub.value;updateColors();drawCharts();});
+let playT=null;
+document.getElementById('playBtn').addEventListener('click',e=>{if(playT){clearInterval(playT);playT=null;e.target.textContent='Play';return;}
+  e.target.textContent='Pause';playT=setInterval(()=>{view.k=(view.k+1)%432;scrub.value=view.k;updateColors();drawCharts();},70);});
+
+function setupCanvas(cv){const r=cv.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(10,r.width),h=Math.max(10,r.height);
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return {ctx,w,h};}
+const PL=40,PR=10;
+function frame(ctx,w,h,pt,pb,ymin,ymax,unit,step){
+  const X=t=>PL+t/72*(w-PL-PR),Y=v=>pt+(1-(v-ymin)/(ymax-ymin))*(h-pt-pb);
+  const R=result;ctx.fillStyle=css('--c-fire');
+  if(R){let s=-1;for(let k=0;k<=432;k++){const on=k<432&&R.ser.fire[k]>0;if(on&&s<0)s=k;if(!on&&s>=0){ctx.fillRect(X(s/6),pt,X(k/6)-X(s/6),h-pt-pb);s=-1;}}}
+  ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.fillStyle=css('--muted');ctx.font='10.5px "IBM Plex Mono",monospace';ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let v=Math.ceil(ymin/step)*step;v<=ymax+1e-6;v+=step){const y=Math.round(Y(v))+0.5;ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(w-PR,y);ctx.stroke();ctx.fillText(v+unit,PL-5,y);}
+  ctx.strokeStyle=css('--muted');ctx.globalAlpha=0.5;for(const d of [24,48]){const x=Math.round(X(d))+0.5;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,h-pb);ctx.stroke();}ctx.globalAlpha=1;
+  return {X,Y};}
+function line(ctx,X,Y,arr,color,width,dash){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash||[]);ctx.beginPath();let st=false;
+  for(let k=0;k<arr.length;k++){const v=arr[k];if(!isFinite(v)){st=false;continue;}const x=X((k+1)/6),y=Y(v);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);}
+function cursorLine(ctx,X,h,pt,pb){const x=Math.round(X((view.k+1)/6))+0.5;ctx.strokeStyle=css('--ink');ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,pt);ctx.lineTo(x,h-pb);ctx.stroke();}
+function niceStep(range,target){const raw=range/target,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
+function drawCharts(){const R=result;
+  {const {ctx,w,h}=setupCanvas(document.getElementById('chartT'));if(!R)return;const s=R.ser;
+    let lo=S.outdoor,hi=S.target;for(let k=0;k<432;k++){lo=Math.min(lo,s.room[k]);hi=Math.max(hi,s.room[k]);if(isFinite(s.benchTop[k]))hi=Math.max(hi,s.benchTop[k]);}
+    if(baseline)for(const v of baseline.room){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+    const st=niceStep(hi-lo+4,3);lo=Math.floor((lo-1)/st)*st;hi=Math.ceil((hi+1)/st)*st;
+    const {X,Y}=frame(ctx,w,h,14,4,lo,hi,'°',st);
+    ctx.fillStyle=css('--muted');ctx.textAlign='left';ctx.textBaseline='top';ctx.font='600 11px "Barlow Condensed",sans-serif';
+    ['DAY 1','DAY 2','DAY 3'].forEach((t,i)=>ctx.fillText(t,X(i*24)+4,1));
+    ctx.strokeStyle=css('--c-out');ctx.setLineDash([4,3]);ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(X(0),Y(S.outdoor));ctx.lineTo(X(72),Y(S.outdoor));ctx.stroke();
+    ctx.globalAlpha=0.5;ctx.strokeStyle=css('--c-room');ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(X(0),Y(S.target));ctx.lineTo(X(72),Y(S.target));ctx.stroke();ctx.globalAlpha=1;ctx.setLineDash([]);
+    if(baseline){ctx.globalAlpha=0.6;line(ctx,X,Y,baseline.room,css('--c-room'),1.4,[5,3]);ctx.globalAlpha=1;}
+    line(ctx,X,Y,s.benchTop,css('--c-bench'),1.6);line(ctx,X,Y,s.room,css('--c-room'),2.2);
+    cursorLine(ctx,X,h,14,4);}
+  {const {ctx,w,h}=setupCanvas(document.getElementById('chartP'));if(!R)return;const s=R.ser;
+    let hi=R.demand/1000;for(let k=0;k<432;k++)hi=Math.max(hi,(s.pBarrel[k]+s.pBench[k]+s.pPipe[k])/1000);
+    const st=niceStep(hi,3);hi=Math.ceil(hi/st)*st||1;
+    const {X,Y}=frame(ctx,w,h,4,14,0,hi,'',st);
+    const layers=[['pBench','--c-bench'],['pPipe','--c-pipe'],['pBarrel','--c-barrel']];const base=new Float32Array(432);
+    for(const [key,col] of layers){ctx.fillStyle=css(col);ctx.beginPath();ctx.moveTo(X(1/6),Y(base[0]));
+      for(let k=0;k<432;k++)ctx.lineTo(X((k+1)/6),Y((base[k]+Math.max(0,s[key][k]))/1000));
+      for(let k=431;k>=0;k--){ctx.lineTo(X((k+1)/6),Y(base[k]/1000));}ctx.closePath();ctx.globalAlpha=0.85;ctx.fill();ctx.globalAlpha=1;
+      for(let k=0;k<432;k++)base[k]+=Math.max(0,s[key][k]);}
+    ctx.strokeStyle=css('--ink');ctx.globalAlpha=0.55;ctx.setLineDash([4,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X(0),Y(R.demand/1000));ctx.lineTo(X(72),Y(R.demand/1000));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=css('--ink');ctx.textAlign='right';ctx.textBaseline='bottom';ctx.font='10.5px "IBM Plex Mono",monospace';ctx.fillText(`room needs ${(R.demand/1000).toFixed(1)} kW at ${S.target}°`,w-PR-2,Y(R.demand/1000)-2);ctx.globalAlpha=1;
+    ctx.fillStyle=css('--muted');ctx.textAlign='center';ctx.textBaseline='top';
+    for(let t=0;t<=72;t+=6){ctx.fillText(t%24===0?(t===72?'72 h':'00'):String(t%24).padStart(2,'0'),X(t),h-12);}
+    ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('kW',PL-5,Y(hi)+10);
+    cursorLine(ctx,X,h,4,14);}
+}
+for(const cv of [document.getElementById('chartT'),document.getElementById('chartP')]){
+  const go=e=>{const r=cv.getBoundingClientRect();const t=(e.clientX-r.left-PL)/(r.width-PL-PR)*72;view.k=Math.max(0,Math.min(431,Math.round(t*6)-1));scrub.value=view.k;updateColors();drawCharts();};
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);go(e);});
+  cv.addEventListener('pointermove',e=>{if(e.buttons)go(e);});}
+
+/* ---------- theme & boot ---------- */
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+syncControls();setTool('mass');applyTheme();resize();runSim();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawCharts);
+})();
+</script>
