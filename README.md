@@ -1,7 +1,11 @@
 # Rocket Mass Heater Simulator
 
 A single-page 3D tool for sketching a rocket mass heater and seeing how it performs.
-Open `rocket-mass-heater-simulator.html` in a browser; there is nothing to build or install.
+Try it at **https://dmarkscouk.github.io/rocket-mass-heater-simulator/**, or open
+`rocket-mass-heater-simulator.html` in a browser; there is nothing to build or install.
+
+Every push to `main` redeploys the site. The workflow in `.github/workflows/pages.yml` wraps the
+simulator in the document shell from `.github/pages/head.html` to make `index.html`.
 
 ## What you can do
 
