@@ -174,6 +174,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <label for="preset">Start from</label>
     <select id="preset">
       <option value="">Choose a layout…</option>
+      <option value="full">Firebrick bell, big bench + exchanger</option>
       <option value="classic">Classic 8″ cob bench</option>
       <option value="compact">Compact 6″ cabin bench</option>
       <option value="wrapped">8″ bench, insulated drum</option>
@@ -436,6 +437,8 @@ const PRESETS={
   bigwrapped(){const S=blank();S.riserH=1.5;S.kg=10;
     fillRect(S,4,0,19,3,'cob',4);fillRect(S,4,0,19,0,'cob',8);route(S,[[4,1],[18,1],[18,2],[6,2]]);return wrapDrum(S);},
   bigwrappedhx(){const S=PRESETS.bigwrapped();S.hx=true;S.hxEff=70;return S;},
+  // the default layout: everything switched on
+  full(){const S=PRESETS.bigwrappedhx();S.bell=1;sanitize(S);return S;},
   uninsulated(){const S=PRESETS.classic();S.coreIns='none';return S;},
   bare(){const S=PRESETS.classic();S.cells.fill(null);return S;},
   overlong(){const S=blank();fillRect(S,4,0,22,4,'cob',3);route(S,[[4,1],[21,1],[21,2],[5,2],[5,3],[21,3]]);return S;}
@@ -446,7 +449,7 @@ function wrapDrum(S){const P=sysParams(S),{x,y}=S.core,top=Math.min(MAXL,Math.ce
     if(cur){const L=cur.L.slice();while(L.length<top)L.push(occAt(S,c,L.length)==='full'?null:'ceramic');S.cells[c]=trimCell(L);}
     else S.cells[c]=colFor(S,c,top,'ceramic');}
   return S;}
-let S=load()||PRESETS.classic();
+let S=load()||PRESETS.full();
 function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
   // older saves stored one material and a height per column
   S.cells=S.cells.map(c=>c?trimCell((c.L||Array(c.h||0).fill(c.m)).map(m=>MATS[m]?m:null)):null);
