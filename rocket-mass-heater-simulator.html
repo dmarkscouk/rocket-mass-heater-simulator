@@ -172,7 +172,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <div class="ctl-inline">
     <label for="preset">Start from</label>
     <select id="preset">
-      <option value="">Choose a layout…</option>
+      <option value="">Choose a design…</option>
       <option value="full">Firebrick bell, big bench + exchanger</option>
       <option value="classic">Classic 8″ cob bench</option>
       <option value="compact">Compact 6″ cabin bench</option>
@@ -184,6 +184,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <option value="bare">Bare flue pipe, no mass</option>
       <option value="overlong">Overlong flue run</option>
     </select>
+  </div>
+  <div class="ctl-inline">
+    <label for="layout">Layout</label>
+    <select id="layout" title="Rebuilds the mass and flue in this shape at the current bench length. Keeps the core, firing and room settings."></select>
   </div>
   <div class="ctl-inline">
     <label for="benchLen">Bench length</label>
@@ -415,7 +419,7 @@ const STARTS={1:[18],2:[7,18],3:[7,13,19]};
 
 /* ---------- state ---------- */
 function blank(){return {cells:new Array(GW*GH).fill(null),core:{x:2,y:1},duct:[],size:8,riserH:1.2,coreIns:'perlite',coreInsT:75,
-  burns:2,kg:9,fireH:6,cap:true,hx:false,hxEff:70,bell:0,benchN:0,house:'average',outdoor:0,target:19,floorIns:'50',chimney:1};}
+  burns:2,kg:9,fireH:6,cap:true,hx:false,hxEff:70,bell:0,benchN:0,house:'average',outdoor:0,target:19,floorIns:'50',chimney:1,layout:'traditional',batt:null};}
 function isCore(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x-2&&i<=x+1;}
 function isBarrel(S,i,j){const {x,y}=S.core;return j>=y&&j<=y+1&&i>=x&&i<=x+1;}
 function adjBarrel(S,c){const i=ci(c),j=cj(c);if(isCore(S,i,j))return false;
@@ -450,10 +454,50 @@ function wrapDrum(S){const P=sysParams(S),{x,y}=S.core,top=Math.min(MAXL,Math.ce
    Replaces the mass and flue, keeps every other setting. */
 const BENCH_LENGTHS=[[2,'1×'],[3,'1.5×'],[4,'2×'],[5,'2.5×'],[6,'3×'],[8,'4×'],[10,'5×']];
 const benchCells=n=>15+14*(n-1);
-function buildBench(S,n){S.cells=new Array(GW*GH).fill(null);S.core={x:2,y:1};
+function buildBench(S,n){S.cells=new Array(GW*GH).fill(null);S.core={x:2,y:1};S.batt=null;
   fillRect(S,4,0,19,n+1,'cob',4);fillRect(S,4,0,19,0,'cob',8);
   const w=[[4,1],[18,1]];for(let k=1;k<n;k++){w.push([k%2?18:6,k+1],[k%2?6:18,k+1]);}
-  route(S,w);S.benchN=n;return wrapDrum(S);}
+  route(S,w);S.benchN=n;S.layout='traditional';return wrapDrum(S);}
+/* Other bench shapes. Each takes the same length setting n and lays benchCells(n) cells of flue, so a 2× double-sided
+   bench has the same flue length (and draft) as a 2× traditional one. */
+const LAYOUTS={
+  traditional:{name:'Traditional bench',note:'One bench along the back wall, the flue snaking through it.'},
+  double:{name:'Double-sided',note:'The core in the middle of the wall with a bench either side. The flue runs out through the right bench, back behind the core, and through the left bench to the chimney.'},
+  ring:{name:'Around the room',note:'A bench along the walls. Short lengths make an L or U; from about 2.5× it goes right round, and longer runs add an inner lap.'},
+  floor:{name:'Heated floor',note:'A 45 cm cob floor over the whole room, with the flue in passes 50 cm apart. Short lengths only heat part of it.'},
+  battery:{name:'Bench + ground battery',note:'The flue first drops into a 90 cm bed of sand under the bench, loops through it, then comes up into a bench one pass shorter.'}
+};
+function pathTo(wps){const T={duct:[]};route(T,wps);return T.duct;}
+// columns of cob around each flue cell: h layers, or hEdge against a wall (a backrest)
+function massAround(S,path,h,hEdge,skip){for(const c of path)for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){
+  const i=ci(c)+di,j=cj(c)+dj;if(!inGrid(i,j)||isCore(S,i,j)||(skip&&skip(i,j)))continue;
+  const edge=hEdge&&(i===0||j===0||i===GW-1||j===GH-1),hh=edge?hEdge:h,cc=id(i,j);
+  if(hgt(S.cells[cc])<hh)S.cells[cc]=colFor(S,cc,hh,'cob');}}
+function buildLayout(S,kind,n){
+  if(kind==='traditional')return buildBench(S,n);
+  S.cells=new Array(GW*GH).fill(null);S.batt=null;S.benchN=n;S.layout=kind;const N=benchCells(n);
+  if(kind==='double'){S.core={x:11,y:1};let best=null;
+    // k passes each side; w cells of flue along each bench (shorter benches for the shortest lengths)
+    for(let k=1;k<=8&&!best;k++)for(let w=3;w<=8&&!best;w++){const R=13+w,Lx=8-w;let x=13,y=Math.min(2,k);const wp=[[x,y]];
+      const go=(nx,ny)=>{wp.push([nx,ny]);x=nx;y=ny;};
+      go(13,k);for(let r=k;r>=1;r--){go(x,r);go(x===R?14:R,r);}   // right bench, ending on row 1
+      go(x,0);go(Lx,0);                                           // back row, behind the core
+      for(let r=1;r<=k;r++){go(x,r);go(x===Lx?7:Lx,r);}           // left bench
+      const p=pathTo(wp);if(p.length>=N||(k===8&&w===8))best=p;}
+    S.duct=best.slice(0,N);massAround(S,S.duct,4,8);}
+  else if(kind==='ring'){S.core={x:2,y:1};
+    const p=pathTo([[4,1],[22,1],[22,14],[1,14],[1,4],[2,4],[2,13],[21,13],[21,2],[5,2],[5,3],[20,3],[20,12],[3,12],[3,5]]);
+    S.duct=p.slice(0,N);massAround(S,S.duct,3,7);
+    // no backrest beside the feed tube, so wood can still be loaded
+    for(let j=3;j<=4;j++){const c=id(0,j);if(S.cells[c])S.cells[c]=colFor(S,c,3,'cob');}}
+  else if(kind==='floor'){S.core={x:2,y:1};fillRect(S,0,0,GW-1,GH-1,'cob',3);
+    const wp=[[4,1],[22,1]];let x=22;for(let r=3;r<GH;r+=2){wp.push([x,r]);x=x===22?1:22;wp.push([x,r]);}
+    S.duct=pathTo(wp).slice(0,N);}
+  else if(kind==='battery'){buildBench(S,Math.max(1,n-1));S.layout='battery';S.benchN=n;
+    // sand bed under the whole bench: out under the back row and back under the third, then up into the bench
+    const foot=[];for(let c=0;c<GW*GH;c++)if(S.cells[c]&&!isCore(S,ci(c),cj(c))&&ci(c)>=4)foot.push(c);
+    S.batt={d:6,pipe:2,cells:foot,path:pathTo([[4,0],[8,0],[8,2],[4,2]])};}
+  sanitize(S);return wrapDrum(S);}
 let S=load()||PRESETS.full();
 function load(){try{const t=localStorage.getItem('rmh-sim-v1');if(!t)return null;const o=JSON.parse(t);const S=Object.assign(blank(),o);if(o.fireH==null&&o.coolBurn)S.fireH=o.coolBurn;if(!Array.isArray(S.cells)||S.cells.length!==GW*GH)return null;
   // older saves stored one material and a height per column
@@ -474,9 +518,12 @@ function ductInfo(S){const d=S.duct,n=d.length;let bends=0;const bend=new Uint8A
   for(let k=1;k<n-1;k++){const a=d[k-1],b=d[k],c=d[k+1];
     if(ci(b)-ci(a)!==ci(c)-ci(b)||cj(b)-cj(a)!==cj(c)-cj(b)){bends++;bend[k]=1;}}
   // the exchanger's narrow annulus costs about as much draft as 1.5 m of extra flue
-  const P=sysParams(S),L=n*CELL,Leq=L+1.5*bends+(S.hx?1.5:0),Lmax=P.Lmax*Math.sqrt(S.riserH/1.2);
+  // a battery loop adds its own length, its bends, and the drop into the ground and climb back out
+  const bp=S.batt?S.batt.path:[];let bb=bp.length?2:0;
+  for(let k=1;k<bp.length-1;k++){const a=bp[k-1],b=bp[k],c=bp[k+1];if(ci(b)-ci(a)!==ci(c)-ci(b)||cj(b)-cj(a)!==cj(c)-cj(b))bb++;}
+  const Lb=bp.length*CELL,P=sysParams(S),L=n*CELL,Leq=L+Lb+1.5*(bends+bb)+(S.hx?1.5:0),Lmax=P.Lmax*Math.sqrt(S.riserH/1.2);
   let bare=0,thin=0;for(const c of d){const cell=S.cells[c];if(!cell)bare++;else if(hgt(cell)-ductLayer(cell)<2)thin++;}
-  return {n,bends,bend,L,Leq,Lmax,margin:n?Lmax/Leq:3,bare,thin};}
+  return {n,bends,bend,L,Lb,Leq,Lmax,margin:n?Lmax/Leq:3,bare,thin};}
 const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
 const SIG=5.67e-8;
 function hrad(T1,T2){const a=T1+273.15,b=T2+273.15;return 0.9*SIG*(a*a+b*b)*(a+b);}
@@ -493,11 +540,15 @@ function simulate(S,opt){
   const UAloss=aOut/Rcore,UAin=aIn*45,UAbi=P.Ab*5;
   // only the hot face of the liner and the inner part of the insulation swing with each fire
   const Ccore=P.liner*900*sc+aOut*tIns*ins.rho*900*0.05;
-  const house=HOUSES[S.house],Ufl=FLOOR[S.floorIns].U,Tground=10;
+  const house=HOUSES[S.house],Ufl=FLOOR[S.floorIns].U;
+  // the soil starts at the same temperature as everything else, so a big floor or battery gets no free heat from it
+  const Tground=opt.T0!=null?opt.T0:10;
 
   // mass nodes
   const nodeIdx=new Int32Array(GW*GH*MAXL).fill(-1);let n=0;
   for(let c=0;c<GW*GH;c++){const cell=S.cells[c];if(!cell)continue;for(let l=0;l<hgt(cell);l++)if(cell.L[l])nodeIdx[c*MAXL+l]=n++;}
+  // ground battery nodes follow the mass nodes: footprint cell f, layer l (0 just below the floor) is nm+f*bK+l
+  const B=S.batt&&S.batt.cells.length?S.batt:null,bK=B?B.d:0,nm=n;n+=B?B.cells.length*bK:0;
   const C=new Float64Array(n),K=new Float64Array(n),F=new Float64Array(n),Gs=new Float64Array(n),Gg=new Float64Array(n);
   const top=[],la=[],lb=[],lg=[];const Af=CELL*CELL,As=CELL*DZ,hS=8.5,chimC=S.duct.length?S.duct[S.duct.length-1]:-1;
   // F: share of the cell's footprint the block fills once it is cut around a pipe or the drum
@@ -510,6 +561,19 @@ function simulate(S,opt){
       for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;const j=inGrid(nx,ny)?nodeIdx[id(nx,ny)*MAXL+l]:-1;
         if(j<0)Gs[i]+=hS*As*F[i];else if(dx===1||dy===1){la.push(i);lb.push(j);lg.push(Math.min(F[i],F[j])*As/(CELL/2/K[i]+CELL/2/K[j]));}}
       if(l+1<ch){const j=nodeIdx[c*MAXL+l+1];if(j>=0){la.push(i);lb.push(j);lg.push(Math.min(F[i],F[j])*Af/(DZ/2/K[i]+DZ/2/K[j]));}}}}
+  // ground battery: a sand bed d layers deep under the bench; its sides and bottom lose to the soil through the
+  // floor insulation, and its top warms whatever stands on it with nothing in between
+  const bF=new Int32Array(GW*GH).fill(-1);
+  if(B){const sm=MATS.sand;B.cells.forEach((c,f)=>{bF[c]=f;});
+    B.cells.forEach((c,f)=>{const x=ci(c),y=cj(c);
+      for(let l=0;l<bK;l++){const i=nm+f*bK+l;F[i]=1;C[i]=sm.rho*sm.cp*Af*DZ;K[i]=sm.k;
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,g=inGrid(nx,ny)?bF[id(nx,ny)]:-1;
+          if(g<0)Gg[i]+=Ufl*As;else if(dx===1||dy===1){la.push(i);lb.push(nm+g*bK+l);lg.push(As*sm.k/CELL);}}
+        if(l+1<bK){la.push(i);lb.push(i+1);lg.push(Af*sm.k/DZ);}else Gg[i]+=Ufl*Af;}
+      const above=nodeIdx[c*MAXL];
+      if(above>=0){Gg[above]=0;la.push(nm+f*bK);lb.push(above);lg.push(F[above]*Af/(DZ/2/sm.k+DZ/2/K[above]));}
+      else Gs[nm+f*bK]+=hS*Af*0.5;});}
+  const bPath=B?B.path:[],nbp=bPath.length,bNode=Int32Array.from(bPath.map(c=>bF[c]>=0?nm+bF[c]*bK+B.pipe:-1));
   // drum wrap: heat passes from the drum wall into each touching block through a contact film and half the
   // block's thickness, so insulation holds the heat in while cob or brick soaks it up
   const P0=P,bb=barrelBottom(S,P0),bt=bb+P0.bH,wrapN=[],wrapG=[];let Acov=0;
@@ -548,6 +612,7 @@ function simulate(S,opt){
   // changes temperature by the same amount: effectiveness × (exhaust in − room)
   const eps=S.hx?S.hxEff/100:0;let maxAir3=0;
   const Tsnap=new Float32Array(opt.light?0:NK*n),gas=new Float32Array(nd),gasSnap=new Float32Array(opt.light?0:NK*nd);
+  const bgas=new Float32Array(nbp),bGasSnap=new Float32Array(opt.light?0:NK*nbp);
   const mk=()=>new Float32Array(NK);
   const ser={room:mk(),benchTop:mk(),benchMax:mk(),exit:mk(),riserGas:mk(),core:mk(),barrel:mk(),pFire:mk(),pBarrel:mk(),pBench:mk(),pPipe:mk(),fire:mk(),air:mk()};
   let aF=0,aB=0,aBe=0,aP=0,aFire=0,aExit=0,aRg=0,aAir=0;
@@ -574,6 +639,8 @@ function simulate(S,opt){
     if(P.bell){const Qio=P.Gio*(Tb-To);Tb+=dt*(Qbin+Qcl-Qio)/P.Cb;To+=dt*(Qio-Qbr-Qwrap)/P.Cout;}
     else Tb+=dt*(Qbin+Qcl-Qbr-Qwrap)/P.Cb;
     let Tg=Tg2,Qpipe=0;
+    // the battery comes first, straight from the drum, so it gets the hottest gas
+    for(let k=0;k<nbp;k++){bgas[k]=Tg;const nn=bNode[k];if(nn<0)continue;const Tm=T[nn],T2=Tm+(Tg-Tm)*Math.exp(-hIn*A1/mcp);Qacc[nn]+=mcp*(Tg-T2);Tg=T2;}
     for(let k=0;k<nd;k++){gas[k]=Tg;const nn=dNode[k];
       if(nn>=0){const Tm=T[nn],T2=Tm+(Tg-Tm)*Math.exp(-UAd[k]*cov[k]/mcp);Qacc[nn]+=mcp*(Tg-T2);Tg=T2;
         if(cov[k]<1){const T3=Tr+(Tg-Tr)*Math.exp(-UAair[k]*(1-cov[k])/mcp);Qpipe+=mcp*(Tg-T3);Tg=T3;}}
@@ -595,7 +662,7 @@ function simulate(S,opt){
       if(firing){maxExit3=Math.max(maxExit3,Tex);minEta=Math.min(minEta,eta);}maxCore3=Math.max(maxCore3,Tc);maxBarrel3=Math.max(maxBarrel3,Ts);maxInner3=Math.max(maxInner3,Tb);}
     aF+=Qf;aB+=Qbr;aBe+=Qsurf;aP+=Qpipe;aFire+=firing?1:0;aExit+=Tex;aRg+=Tg1;aAir+=Tair;
     if((s+1)%SE===0){const k=(s+1)/SE-1;
-      if(!opt.light){Tsnap.set(n?T:[],k*n);if(nd)gasSnap.set(gas,k*nd);}
+      if(!opt.light){Tsnap.set(n?T:[],k*n);if(nd)gasSnap.set(gas,k*nd);if(nbp)bGasSnap.set(bgas,k*nbp);}
       let st=0,mx=-1e9;for(const i of top){st+=T[i];if(T[i]>mx)mx=T[i];}
       ser.room[k]=Tr;ser.benchTop[k]=top.length?st/top.length:NaN;ser.benchMax[k]=top.length?mx:NaN;
       ser.exit[k]=aExit/SE;ser.riserGas[k]=aRg/SE;ser.core[k]=Tc;ser.barrel[k]=P.bell?To:Tb;
@@ -611,7 +678,9 @@ function simulate(S,opt){
   const fireEnd=Math.max(0,...iv.map(v=>v[1])),backAt=outdoor+1;let back=null;
   if(rmax<=backAt)back=0;else for(let k=peakK;k<NK;k++)if(ser.room[k]<=backAt){back=Math.max(0,(k+1)/6-fireEnd);break;}
   const delivered=E.barrel+E.bench+E.pipe;
-  return {n,nodeIdx,Tsnap,gasSnap,nd,ductKey:S.duct.join(','),ser,NK,hours:NS*dt/3600,E,dStore,fireEnd,back,peakH:(peakK+1)/6,
+  let battPeak=NaN;if(B&&!opt.light){battPeak=-1e9;for(let k=0;k<NK;k++)for(let i=nm;i<n;i++)battPeak=Math.max(battPeak,Tsnap[k*n+i]);}
+  return {n,nm,bK,nbp,bGasSnap,battPeak,battStore:B?T.slice(nm).reduce((a,t,i)=>a+C[nm+i]*(t-(opt.T0!=null?opt.T0:0)),0):0,
+    nodeIdx,Tsnap,gasSnap,nd,ductKey:S.duct.join(',')+'|'+bPath.join(','),ser,NK,hours:NS*dt/3600,E,dStore,fireEnd,back,peakH:(peakK+1)/6,
     kg:E.fuel/15e6,
     // heat still soaking into the mass at the end is kept indoors, just not released yet
     eff:E.fuel?(delivered+Math.max(0,dStore))/E.fuel:0,roomMin:rmin,roomMax:rmax,comfortH:hrs,benchPeak:top.length?bpk:NaN,hasMass:top.length>0,
@@ -653,7 +722,7 @@ const floor=new THREE.Mesh(new THREE.PlaneGeometry(GW*CELL,GH*CELL),floorMat);fl
 let grid=null;
 const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 
-const MAXI=GW*GH*MAXL;
+const MAXI=GW*GH*(MAXL+8);   // room for a ground battery below the floor
 const voxMat=new THREE.MeshStandardMaterial({roughness:0.92,metalness:0});
 const vox=new THREE.InstancedMesh(new THREE.BoxGeometry(CELL*0.985,DZ*0.985,CELL*0.985),voxMat,MAXI);
 vox.setColorAt(0,new THREE.Color()); // allocates the colour buffer for all MAXI instances, so must precede count=0
@@ -662,7 +731,7 @@ let instCell=new Int32Array(MAXI),instLayer=new Int32Array(MAXI);
 
 const dynamic=new THREE.Group();scene.add(dynamic);
 const cylGeo=new THREE.CylinderGeometry(1,1,1,16),sphGeo=new THREE.SphereGeometry(1,14,10);
-let ductMeshes=[],chimneyMesh=null,hxAirMat=null,barrelMesh=null,riserMesh=null,insMesh=null;
+let ductMeshes=[],battMeshes=[],chimneyMesh=null,hxAirMat=null,barrelMesh=null,riserMesh=null,insMesh=null;
 const cursor=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.22,depthWrite:false}));
 const cursorEdge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0xffffff}));
 cursor.add(cursorEdge);cursor.visible=false;scene.add(cursor);
@@ -732,10 +801,14 @@ function buildScene(){
         const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({roughness:0.92,transparent:view.xray,opacity:view.xray?0.28:1,depthWrite:!view.xray}));
         m.position.set(cx(ci(c)),l*DZ+DZ*0.0075,cz(cj(c)));m.userData={c,l};clipGroup.add(m);continue;}
       mtx.makeTranslation(cx(ci(c)),DZ*(l+0.5),cz(cj(c)));vox.setMatrixAt(k,mtx);instCell[k]=c;instLayer[k]=l;k++;}}
+  // ground battery blocks sit below the floor: instCell holds the footprint index and instLayer is -(depth layer+1)
+  if(S.batt)S.batt.cells.forEach((c,f)=>{for(let l=0;l<S.batt.d;l++){
+    mtx.makeTranslation(cx(ci(c)),-DZ*(l+0.5),cz(cj(c)));vox.setMatrixAt(k,mtx);instCell[k]=f;instLayer[k]=-(l+1);k++;}});
+  floorMat.transparent=!!S.batt;floorMat.opacity=S.batt?0.3:1;floorMat.depthWrite=!S.batt;floorMat.needsUpdate=true;
   vox.count=k;vox.instanceMatrix.needsUpdate=true;
   voxMat.transparent=view.xray;voxMat.opacity=view.xray?0.28:1;voxMat.depthWrite=!view.xray;voxMat.needsUpdate=true;
 
-  disposeGroup(dynamic);ductMeshes=[];
+  disposeGroup(dynamic);ductMeshes=[];battMeshes=[];
   const P=sysParams(S),{x,y}=S.core,r=P.D/2,yD=r+0.03;
   // core base, feed tube, manifold, barrel, riser
   const baseMat=new THREE.MeshStandardMaterial({color:0x9b7d5c,roughness:0.95});
@@ -759,10 +832,18 @@ function buildScene(){
   const pts=S.duct.map(c=>new THREE.Vector3(cx(ci(c)),yD+ductLayer(S.cells[c])*DZ,cz(cj(c))));
   if(pts.length){const c0=S.duct[0],i0=ci(c0),j0=cj(c0);let start=null;
     for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]])if(isBarrel(S,i0+a,j0+b)){start=new THREE.Vector3(cx(i0)+a*CELL/2,pts[0].y,cz(j0)+b*CELL/2);break;}
-    const segs=[[start,pts[0]]];for(let k2=1;k2<pts.length;k2++)segs.push([pts[k2-1],pts[k2]]);
+    // with a battery the drum feeds the buried loop instead, which comes back up into the first bench cell
+    const segs=S.batt?[]:[[start,pts[0]]];for(let k2=1;k2<pts.length;k2++)segs.push([pts[k2-1],pts[k2]]);
     segs.forEach(([a,b],k2)=>{const mat=new THREE.MeshStandardMaterial({roughness:0.6,metalness:0.3});
       const g=new THREE.Group();g.add(cyl(a,b,r,mat));const s=new THREE.Mesh(sphGeo,mat);s.scale.setScalar(r);s.position.copy(b);g.add(s);dynamic.add(g);ductMeshes.push(mat);});
   }
+  if(S.batt&&S.batt.path.length){const bp=S.batt.path,yb=-DZ*(S.batt.pipe+0.5),V=c=>new THREE.Vector3(cx(ci(c)),yb,cz(cj(c)));
+    const a0=new THREE.Vector3(cx(ci(bp[0])),yD,cz(cj(bp[0]))),bpts=[a0,...bp.map(V)],z=bpts[bpts.length-1];
+    bpts.push(new THREE.Vector3(z.x,yD,z.z));if(pts.length)bpts.push(pts[0]);
+    const bStart=new THREE.Vector3(bx+P.bR*0.7,yD,bz-P.bR*0.7);bpts.unshift(bStart);
+    for(let k2=1;k2<bpts.length;k2++){const mat=new THREE.MeshStandardMaterial({roughness:0.6,metalness:0.3});
+      const g=new THREE.Group();g.add(cyl(bpts[k2-1],bpts[k2],r,mat));const s=new THREE.Mesh(sphGeo,mat);s.scale.setScalar(r);s.position.copy(bpts[k2]);g.add(s);dynamic.add(g);
+      battMeshes.push({mat,k:Math.max(0,Math.min(bp.length-1,k2-2))});}}
   const chPos=pts.length?pts[pts.length-1]:new THREE.Vector3(bx+P.bR+0.15,0,bz);
   const chMat=new THREE.MeshStandardMaterial({roughness:0.5,metalness:0.4});
   const ch=cyl(new THREE.Vector3(chPos.x,pts.length?chPos.y:yD,chPos.z),new THREE.Vector3(chPos.x,2.6,chPos.z),r+0.005,chMat);dynamic.add(ch);chimneyMesh=chMat;
@@ -780,7 +861,10 @@ const tmpC=new THREE.Color();
 function updateColors(){
   const R=result,k=view.k,valid=R&&R.ser;
   const room=valid?R.ser.room[k]:15;
-  const blockColor=(c,l,out)=>{const cell=S.cells[c],mat=MATS[cell.L[l]];
+  const blockColor=(c,l,out)=>{
+    if(l<0){const nn=valid&&R.bK?R.nm+c*R.bK+(-l-1):-1;if(!view.matMode&&nn>=0&&nn<R.n){tempColor(R.Tsnap[k*R.n+nn],out);out.lerp(_mc.set(MATS.sand.color),0.12);}
+      else out.set(MATS.sand.color).multiplyScalar(0.8);return out;}
+    const cell=S.cells[c],mat=MATS[cell.L[l]];
     if(!view.matMode&&valid){const nn=R.nodeIdx[c*MAXL+l];
       if(nn>=0&&nn<R.n)tempColor(R.Tsnap[k*R.n+nn],out);else out.set(mat.color).multiplyScalar(0.7);
       // material tint so materials stay readable; insulation gets a stronger one so it stands out
@@ -792,6 +876,7 @@ function updateColors(){
   for(const m of clipGroup.children)blockColor(m.userData.c,m.userData.l,m.material.color);
   const ductOK=valid&&R.ductKey===S.duct.join(',');
   ductMeshes.forEach((m,i)=>{if(ductOK)tempColor(R.gasSnap[k*R.nd+i],m.color);else m.color.set(0x777777);});
+  battMeshes.forEach(b=>{if(ductOK&&R.nbp)tempColor(R.bGasSnap[k*R.nbp+b.k],b.mat.color);else b.mat.color.set(0x777777);});
   if(chimneyMesh){if(valid)tempColor(R.ser.exit[k],chimneyMesh.color);else chimneyMesh.color.set(0x555555);}
   if(hxAirMat){if(valid)tempColor(R.ser.air[k],hxAirMat.color);else hxAirMat.color.set(0x777777);}
   if(barrelMesh){if(view.matMode&&S.bell)barrelMesh.material.color.set(0xd9b77e);
@@ -812,7 +897,8 @@ const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
 function pick(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
   ray.setFromCamera(ndc,camera);
   if((tool==='mass'||tool==='erase')&&!view.xray){const h=ray.intersectObjects([vox,...clipGroup.children])[0];
-    if(h)return h.object===vox?(h.instanceId!=null?instCell[h.instanceId]:-1):h.object.userData.c;}
+    if(h){if(h.object!==vox)return h.object.userData.c;if(h.instanceId==null)return -1;
+      return instLayer[h.instanceId]<0?S.batt.cells[instCell[h.instanceId]]:instCell[h.instanceId];}}
   const p=new THREE.Vector3();if(ray.ray.intersectPlane(groundPlane,p)){const i=Math.floor((p.x+OX)/CELL),j=Math.floor((p.z+OZ)/CELL);if(inGrid(i,j))return id(i,j);}
   return -1;}
 function brushCells(c,b){const out=[],o=-Math.floor((b-1)/2);for(let dj=0;dj<b;dj++)for(let di=0;di<b;di++){const i=ci(c)+o+di,j=cj(c)+o+dj;if(inGrid(i,j))out.push(id(i,j));}return out;}
@@ -835,7 +921,7 @@ function applyAt(c,first){
       if(topOnly){if(stroke.done.has(cc))continue;stroke.done.add(cc);S.cells[cc]=trimCell(cur.L.slice(0,-1));}else S.cells[cc]=null;ch=true;}
     return ch;}
   if(tool==='core'){if(!first||stroke.erase)return false;const nx=Math.min(GW-2,Math.max(2,i)),ny=Math.min(GH-2,Math.max(0,j));
-    if(nx===S.core.x&&ny===S.core.y)return false;S.core={x:nx,y:ny};
+    if(nx===S.core.x&&ny===S.core.y)return false;S.core={x:nx,y:ny};S.batt=null;   // its loop starts at the drum
     if(S.duct.length&&(!adjBarrel(S,S.duct[0])||S.duct.some(d=>isCore(S,ci(d),cj(d)))))S.duct=[];return true;}
   if(tool==='duct'){const d=S.duct,pos=d.indexOf(c);if(isCore(S,i,j))return false;
     if(stroke.erase){if(pos<0)return false;d.length=pos;return true;}
@@ -913,13 +999,18 @@ syncBrush();
 document.getElementById('wrapBtn').addEventListener('click',()=>{if(!S.duct.length){flash('Draw a flue first.');return;}pushUndo();S.benchN=0;
   for(const c of S.duct)for(const cc of brushCells(c,3))if(!isCore(S,ci(cc),cj(cc))&&!S.cells[cc])S.cells[cc]=colFor(S,cc,Math.max(2,brushH),brushM);
   for(const c of S.duct){const cell=S.cells[c];if(!cell)continue;while(hgt(cell)-ductLayer(cell)<2&&hgt(cell)<MAXL)cell.L.push(brushM);}changed();});
-document.getElementById('clearMass').addEventListener('click',()=>{pushUndo();S.cells.fill(null);S.benchN=0;changed();});
-document.getElementById('clearDuct').addEventListener('click',()=>{pushUndo();S.duct=[];S.benchN=0;changed();});
+document.getElementById('clearMass').addEventListener('click',()=>{pushUndo();S.cells.fill(null);S.benchN=0;S.batt=null;changed();});
+document.getElementById('clearDuct').addEventListener('click',()=>{pushUndo();S.duct=[];S.benchN=0;S.batt=null;changed();});
 document.getElementById('undoBtn').addEventListener('click',doUndo);document.getElementById('undoBtn').disabled=true;
 document.getElementById('viewBtn').addEventListener('click',resetView);
 (function(){const el=document.getElementById('benchLen');
   el.innerHTML='<option value="0" disabled>Custom</option>'+BENCH_LENGTHS.map(([n,l])=>`<option value="${n}">${l} · ${(benchCells(n)*CELL).toFixed(1)} m flue</option>`).join('');
-  el.addEventListener('change',()=>{const n=+el.value;if(!n)return;pushUndo();buildBench(S,n);syncControls();changed();});})();
+  el.addEventListener('change',()=>{const n=+el.value;if(!n)return;pushUndo();buildLayout(S,S.layout||'traditional',n);syncControls();changed();});})();
+(function(){const el=document.getElementById('layout');
+  el.innerHTML='<option value="" disabled>Custom</option>'+Object.entries(LAYOUTS).map(([k,v])=>`<option value="${k}" title="${v.note}">${v.name}</option>`).join('');
+  el.addEventListener('change',()=>{const v=el.value;if(!v)return;pushUndo();
+    // a hand-drawn bench has no length setting, so start from the standard one
+    buildLayout(S,v,S.benchN||2);syncControls();changed();});})();
 document.getElementById('preset').addEventListener('change',e=>{const v=e.target.value;if(!v)return;pushUndo();
   // a layout change keeps the fire and weather
   const keep={fireH:S.fireH,outdoor:S.outdoor};S=Object.assign(PRESETS[v](),keep);e.target.value='';syncControls();changed();});
@@ -949,6 +1040,7 @@ bindInput('hxEff','hxEff',1);
 const hh=h=>{const H=Math.floor(h),M=Math.round((h-H)*60);return String(H).padStart(2,'0')+':'+String(M).padStart(2,'0');};
 function syncControls(){
   document.getElementById('benchLen').value=String(S.benchN||0);
+  document.getElementById('layout').value=S.benchN?S.layout||'traditional':'';
   pressSeg(document.getElementById('sizeSeg'),S.size);pressSeg(document.getElementById('bellSeg'),S.bell?1:0);
   document.getElementById('bellNote').textContent=S.bell
     ?'A 114 mm firebrick box over the riser. It takes hours to heat, holds about 0.4 MJ/K, never warps, and keeps the burn space hot.'
@@ -968,12 +1060,13 @@ function syncControls(){
   o('burnTimes',`A ${S.size}″ core burns up to ${P.rate} kg an hour, so ${S.fireH} h is about ${(P.rate*S.fireH).toFixed(0)} kg of wood (less if the draft is weak).`);
   updateDuctStat();}
 function updateDuctStat(){const DI=ductInfo(S);const el=document.getElementById('ductStat');
-  el.textContent=DI.n?`${DI.L.toFixed(2)} m run · ${DI.bends} bend${DI.bends===1?'':'s'} · counts as ${DI.Leq.toFixed(1)} m of ~${DI.Lmax.toFixed(1)} m`:'No flue yet.';}
+  el.textContent=DI.n?`${DI.L.toFixed(2)} m run${DI.Lb?` + ${DI.Lb.toFixed(2)} m in the battery`:''} · ${DI.bends} bend${DI.bends===1?'':'s'} · counts as ${DI.Leq.toFixed(1)} m of ~${DI.Lmax.toFixed(1)} m`:'No flue yet.';}
 
 function changed(painting,slider){
   // a hand edit to the bench means it no longer matches a generated length
   if(painting)S.benchN=0;
   document.getElementById('benchLen').value=String(S.benchN||0);
+  document.getElementById('layout').value=S.benchN?S.layout||'traditional':'';
   sanitize(S);save();buildScene();if(!slider)updateDuctStat();dirty=true;
   document.getElementById('simStatus').textContent='Recalculating…';
   if(!painting)scheduleSim(slider?350:60);}
@@ -1036,6 +1129,8 @@ function renderResults(){const R=result;if(!R)return;const B=baseline;
   else if(R.hasMass&&R.benchPeak<28&&DI.n)W.push(['warn',`The bench top barely warms (${Math.round(R.benchPeak)} °C). The mass may be too big or too thick for the wood you burn.`]);
   if(DI.n&&R.exitPeak>150)W.push(['warn',`Flue gas leaves at up to ${Math.round(R.exitPeak)} °C. A longer run through mass would keep that heat.`]);
   if(DI.n&&R.exitPeak<45)W.push(['warn',`Flue gas leaves at only ${Math.round(R.exitPeak)} °C. Expect condensation in the chimney and a weak draft on cold days.`]);
+  if(S.batt&&isFinite(R.battPeak))W.push(['good',`The ground battery peaks at ${Math.round(R.battPeak)} °C and still holds ${(R.battStore/1e6).toFixed(0)} MJ (${(R.battStore/(R.E.fuel||1)*100).toFixed(0)}% of the wood’s energy) a week later, rising slowly into the bench above.`]);
+  if(S.layout==='floor'&&S.benchN&&R.hasMass)W.push(['good',`The heated floor's warmest spot reaches ${Math.round(R.benchPeak)} °C. Floors feel comfortable below about 29 °C underfoot.`]);
   if(R.roomMax<S.target)W.push(['warn',`From cold, this fire only lifts the room to ${R.roomMax.toFixed(1)} °C. Much of its heat is still warming the mass; a longer fire, or firing again before it cools, gets more out of it.`]);
   if(!W.length)W.push(['good','No problems found. The core burns hot, the flue draws and the bench holds a comfortable temperature.']);
   document.getElementById('warnings').innerHTML=W.map(w=>`<li class="${w[0]}">${w[1]}</li>`).join('');

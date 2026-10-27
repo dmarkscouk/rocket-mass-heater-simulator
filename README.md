@@ -15,7 +15,9 @@ simulator in the document shell from `.github/pages/head.html` to make `index.ht
 - Place the core, choose a 6″ or 8″ system, riser height and riser insulation.
 - Swap the steel drum for a firebrick bell, and wrap either in mass or insulation.
 - Fit a counterflow heat exchanger that preheats combustion air from the exhaust.
-- Rebuild the bench at 1× to 5× its flue length with the Bench length control.
+- Pick a layout: a traditional bench, a double-sided bench either side of the core, a bench around the
+  room, a heated floor, or a bench over a buried sand heat battery that the flue loops through first.
+- Rebuild the chosen layout at 1× to 5× its flue length with the Bench length control.
 - Set the fire length, building heat loss, outdoor temperature and floor insulation.
 
 ## What it reports
